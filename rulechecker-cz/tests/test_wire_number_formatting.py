@@ -36,5 +36,34 @@ class TestWireNumberFormatting(unittest.TestCase):
         self.assertEqual(records[0].wire_number, "43154\n43155")
 
 
+    def test_prefers_multi_wire_source_when_available(self):
+        df = pd.DataFrame([
+            {
+                "Einschätzung": "Fehler",
+                "Leitungsnummer": "4316543166",
+                "Leitungen": "43165 43166",
+                "Sonderleitung": "SL-1",
+            }
+        ])
+
+        records = parse_rc_sheet(df, 110, get_rc_definition(110))
+
+        self.assertEqual(records[0].wire_number, "43165\n43166")
+
+    def test_splits_numeric_string_with_decimal_suffix(self):
+        df = pd.DataFrame([
+            {
+                "Einschätzung": "Fehler",
+                "Leitungsnummer": "4316543166.0",
+                "Sonderleitung": "SL-1",
+                "Leitungen": "43165 43166",
+            }
+        ])
+
+        records = parse_rc_sheet(df, 110, get_rc_definition(110))
+
+        self.assertEqual(records[0].wire_number, "43165\n43166")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -295,19 +295,29 @@ def _unique_values(df: pd.DataFrame, candidates: list[str]) -> list[str]:
 
 
 def _extract_wire_number(row: pd.Series) -> str:
-    wire_col = _first_available_key(
-        row,
-        [
-            "Leitungsnummer",
-            "Leitung",
-            "Leitungen",
-            "Wire number",
-        ],
-    )
-    if not wire_col:
+    candidate_columns = [
+        "Leitungsnummer",
+        "Leitung",
+        "Leitungen",
+        "Wire number",
+    ]
+
+    normalized_values: list[str] = []
+    for candidate in candidate_columns:
+        key = _first_available_key(row, [candidate])
+        if not key:
+            continue
+        value = _normalize_wire_number(clean_value(row.get(key)))
+        if value and value != "-":
+            normalized_values.append(value)
+
+    if not normalized_values:
         return "-"
-    value = clean_value(row.get(wire_col))
-    return _normalize_wire_number(value)
+
+    for value in normalized_values:
+        if "\n" in value:
+            return value
+    return normalized_values[0]
 
 
 def _normalize_wire_number(value: str) -> str:
@@ -323,11 +333,14 @@ def _normalize_wire_number(value: str) -> str:
         return "\n".join(parts)
 
     compact = parts[0] if parts else value
+    if compact.endswith('.0') and compact.replace('.', '', 1).isdigit():
+        compact = compact[:-2]
+
     if compact.isdigit() and len(compact) >= 10 and len(compact) % 2 == 0:
         half = len(compact) // 2
         return f"{compact[:half]}\n{compact[half:]}"
 
-    return value
+    return compact or "-"
 
 def _first_available_key(row: pd.Series, candidates: list[str]) -> str | None:
     normalized_map = {_normalize_header(str(c)): str(c) for c in row.index}
