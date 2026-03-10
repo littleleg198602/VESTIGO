@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 from config import (
     CRITICAL_SHEET_CZ,
@@ -60,8 +60,29 @@ def _legacy_status(severity_en: str) -> str:
 
 HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
-CRITICAL_FILL = PatternFill("solid", fgColor="F8D7DA")
-NON_CRITICAL_FILL = PatternFill("solid", fgColor="FFF3CD")
+CRITICAL_FILLS = [
+    PatternFill("solid", fgColor="FDE2E4"),
+    PatternFill("solid", fgColor="F8C8CD"),
+    PatternFill("solid", fgColor="F5B5BC"),
+    PatternFill("solid", fgColor="F29CA7"),
+]
+NON_CRITICAL_FILLS = [
+    PatternFill("solid", fgColor="FFF9DB"),
+    PatternFill("solid", fgColor="FFF3BF"),
+    PatternFill("solid", fgColor="FFEC99"),
+    PatternFill("solid", fgColor="FFE066"),
+]
+ROW_BORDER = Border(
+    left=Side(style="thin", color="D9D9D9"),
+    right=Side(style="thin", color="D9D9D9"),
+    top=Side(style="thin", color="D9D9D9"),
+    bottom=Side(style="thin", color="D9D9D9"),
+)
+
+
+def _pick_fill(severity: str, row_idx: int) -> PatternFill:
+    palette = CRITICAL_FILLS if severity in {"Kritické", "Critical", "Not OK"} else NON_CRITICAL_FILLS
+    return palette[row_idx % len(palette)]
 
 
 def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
@@ -154,16 +175,29 @@ def _format_sheet(ws, sheet_name: str) -> None:
             where_col_idx = idx
             break
 
+    critical_row_idx = 0
+    non_critical_row_idx = 0
     for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
         lead_value = str(row[0].value or "")
         if sheet_name == LEGACY_INSPIRED_SHEET_EN:
             priority = str(row[5].value or "")
-            fill = CRITICAL_FILL if priority == "Not OK" else NON_CRITICAL_FILL
+            if priority == "Not OK":
+                fill = _pick_fill(priority, critical_row_idx)
+                critical_row_idx += 1
+            else:
+                fill = _pick_fill(priority, non_critical_row_idx)
+                non_critical_row_idx += 1
         else:
-            fill = CRITICAL_FILL if lead_value in {"Kritické", "Critical"} else NON_CRITICAL_FILL
+            if lead_value in {"Kritické", "Critical"}:
+                fill = _pick_fill(lead_value, critical_row_idx)
+                critical_row_idx += 1
+            else:
+                fill = _pick_fill(lead_value, non_critical_row_idx)
+                non_critical_row_idx += 1
 
         for cell in row:
             cell.fill = fill
+            cell.border = ROW_BORDER
             cell.alignment = Alignment(vertical="top")
         if where_col_idx:
             row[where_col_idx - 1].alignment = Alignment(wrap_text=True, vertical="top")
