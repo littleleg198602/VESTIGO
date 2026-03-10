@@ -43,3 +43,36 @@ def clean_value(value: Any) -> str:
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
     return str(value).strip()
+
+
+MESSAGE_VALUE_REPLACEMENTS = {
+    "der winkel muss größer als 30° sein.": (
+        "Úhel musí být větší než 30°.",
+        "The angle must be greater than 30°.",
+    ),
+    "verknüpfte accessories": (
+        "Propojené příslušenství",
+        "Linked accessories",
+    ),
+}
+
+
+def translate_value(header: str, value: str, lang: str) -> str:
+    """Translate known German free-text fragments in values for CZ/EN outputs."""
+    if not value:
+        return value
+
+    normalized_header = clean_value(header).lower()
+    if normalized_header not in {"meldung", "zpráva", "message"}:
+        return value
+
+    translated = value
+    lowered = translated.lower()
+    for source, (cz_target, en_target) in MESSAGE_VALUE_REPLACEMENTS.items():
+        if source in lowered:
+            target = cz_target if lang == "cz" else en_target
+            start = lowered.index(source)
+            end = start + len(source)
+            translated = translated[:start] + target + translated[end:]
+            lowered = translated.lower()
+    return translated
