@@ -169,11 +169,14 @@ def _format_sheet(ws, sheet_name: str) -> None:
         ws.column_dimensions[col[0].column_letter].width = min(max(max_len + 2, 14), 60)
 
     where_col_name = "Kde je chyba" if "CZ" in sheet_name else "Where is the issue"
+    wire_col_name = "Číslo drátu" if "CZ" in sheet_name else "Wire number"
     where_col_idx = None
+    wire_col_idx = None
     for idx, cell in enumerate(ws[1], start=1):
         if cell.value == where_col_name:
             where_col_idx = idx
-            break
+        if cell.value == wire_col_name:
+            wire_col_idx = idx
 
     critical_row_idx = 0
     non_critical_row_idx = 0
@@ -195,9 +198,19 @@ def _format_sheet(ws, sheet_name: str) -> None:
                 fill = _pick_fill(lead_value, non_critical_row_idx)
                 non_critical_row_idx += 1
 
+        max_lines = 1
         for cell in row:
             cell.fill = fill
             cell.border = ROW_BORDER
             cell.alignment = Alignment(vertical="top")
+            line_count = str(cell.value or "").count("\n") + 1
+            if line_count > max_lines:
+                max_lines = line_count
+
         if where_col_idx:
             row[where_col_idx - 1].alignment = Alignment(wrap_text=True, vertical="top")
+        if wire_col_idx:
+            row[wire_col_idx - 1].alignment = Alignment(wrap_text=True, vertical="top")
+
+        if max_lines > 1:
+            ws.row_dimensions[row[0].row].height = 15 * max_lines
