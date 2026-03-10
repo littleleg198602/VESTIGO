@@ -7,7 +7,7 @@ from typing import Iterable
 
 import pandas as pd
 
-from config import HEADER_STATUS_NAME, PROBLEM_STATUSES
+from config import HEADER_STATUS_NAME
 from rc_maps import RCDefinition, get_rc_definition
 from severity import map_status_to_severity
 from translators import clean_value, translate_header, translate_value
@@ -72,7 +72,8 @@ def parse_workbook(path: Path) -> list[IssueRecord]:
 
 
 def parse_rc_sheet(df: pd.DataFrame, rc: int, defn: RCDefinition, status_col: str = HEADER_STATUS_NAME) -> list[IssueRecord]:
-    filtered = df[df[status_col].astype(str).str.strip().isin(PROBLEM_STATUSES)].copy()
+    severity_series = df[status_col].map(lambda value: map_status_to_severity(clean_value(value)))
+    filtered = df[severity_series.notna()].copy()
     if filtered.empty:
         return []
 
@@ -80,8 +81,8 @@ def parse_rc_sheet(df: pd.DataFrame, rc: int, defn: RCDefinition, status_col: st
         return _parse_rc121_grouped(filtered, rc, defn, status_col)
 
     out: list[IssueRecord] = []
-    for _, row in filtered.iterrows():
-        severity = map_status_to_severity(clean_value(row.get(status_col)))
+    for idx, row in filtered.iterrows():
+        severity = severity_series.loc[idx]
         if not severity:
             continue
         out.append(_build_record_from_row(row, rc, defn, severity.cz, severity.en))
@@ -295,19 +296,52 @@ def _unique_values(df: pd.DataFrame, candidates: list[str]) -> list[str]:
 
 
 def _extract_wire_number(row: pd.Series) -> str:
-    wire_col = _first_available_key(
-        row,
-        [
-            "Leitungsnummer",
-            "Leitung",
-            "Leitungen",
-            "Wire number",
-        ],
-    )
-    if not wire_col:
+    candidate_columns = [
+        "Leitungsnummer",
+        "Leitung",
+        "Leitungen",
+        "Wire number",
+    ]
+
+    normalized_values: list[str] = []
+    for candidate in candidate_columns:
+        key = _first_available_key(row, [candidate])
+        if not key:
+            continue
+        value = _normalize_wire_number(clean_value(row.get(key)))
+        if value and value != "-":
+            normalized_values.append(value)
+
+    if not normalized_values:
         return "-"
-    value = clean_value(row.get(wire_col))
-    return value or "-"
+
+    for value in normalized_values:
+        if "\n" in value:
+            return value
+    return normalized_values[0]
+
+
+def _normalize_wire_number(value: str) -> str:
+    if not value:
+        return "-"
+
+    separators = ["\n", ";", ",", "|", "/", "\\", "\t"]
+    normalized = value
+    for sep in separators:
+        normalized = normalized.replace(sep, " ")
+    parts = [part for part in normalized.split() if part]
+    if len(parts) > 1:
+        return "\n".join(parts)
+
+    compact = parts[0] if parts else value
+    if compact.endswith('.0') and compact.replace('.', '', 1).isdigit():
+        compact = compact[:-2]
+
+    if compact.isdigit() and len(compact) >= 10 and len(compact) % 2 == 0:
+        half = len(compact) // 2
+        return f"{compact[:half]}\n{compact[half:]}"
+
+    return compact or "-"
 
 def _first_available_key(row: pd.Series, candidates: list[str]) -> str | None:
     normalized_map = {_normalize_header(str(c)): str(c) for c in row.index}
