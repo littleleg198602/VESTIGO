@@ -307,7 +307,27 @@ def _extract_wire_number(row: pd.Series) -> str:
     if not wire_col:
         return "-"
     value = clean_value(row.get(wire_col))
-    return value or "-"
+    return _normalize_wire_number(value)
+
+
+def _normalize_wire_number(value: str) -> str:
+    if not value:
+        return "-"
+
+    separators = ["\n", ";", ",", "|", "/", "\\", "\t"]
+    normalized = value
+    for sep in separators:
+        normalized = normalized.replace(sep, " ")
+    parts = [part for part in normalized.split() if part]
+    if len(parts) > 1:
+        return "\n".join(parts)
+
+    compact = parts[0] if parts else value
+    if compact.isdigit() and len(compact) >= 10 and len(compact) % 2 == 0:
+        half = len(compact) // 2
+        return f"{compact[:half]}\n{compact[half:]}"
+
+    return value
 
 def _first_available_key(row: pd.Series, candidates: list[str]) -> str | None:
     normalized_map = {_normalize_header(str(c)): str(c) for c in row.index}
