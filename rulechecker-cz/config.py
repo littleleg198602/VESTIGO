@@ -14,6 +14,7 @@ CRITICAL_SHEET_CZ = "Kriticke_CZ"
 CRITICAL_SHEET_EN = "Critical_EN"
 NON_CRITICAL_SHEET_CZ = "Nekriticke_CZ"
 NON_CRITICAL_SHEET_EN = "NonCritical_EN"
+LEGACY_INSPIRED_SHEET_EN = "LegacyInspired_EN"
 
 OUTPUT_PATTERN_HINTS = [
     "__prehled_cz.xlsx",

@@ -10,6 +10,7 @@ from config import (
     CRITICAL_SHEET_EN,
     NON_CRITICAL_SHEET_CZ,
     NON_CRITICAL_SHEET_EN,
+    LEGACY_INSPIRED_SHEET_EN,
     OUTPUT_SHEET_CZ,
     OUTPUT_SHEET_EN,
 )
@@ -37,6 +38,25 @@ EN_COLUMNS = [
     "Where is the issue",
     "Recommendation",
 ]
+
+LEGACY_EN_COLUMNS = [
+    "Number of mistake",
+    "Type of part",
+    "Name of correction",
+    "Task",
+    "Area",
+    "Priority",
+    "Status",
+    "note",
+]
+
+
+def _legacy_priority(severity_en: str) -> str:
+    return "Not OK" if severity_en == "Critical" else "Warning"
+
+
+def _legacy_status(severity_en: str) -> str:
+    return "in progress" if severity_en == "Critical" else "done"
 
 HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
@@ -77,6 +97,21 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
     cz_df = pd.DataFrame(cz_rows, columns=CZ_COLUMNS)
     en_df = pd.DataFrame(en_rows, columns=EN_COLUMNS)
 
+    legacy_rows = [
+        {
+            "Number of mistake": f"RC {r.rc}",
+            "Type of part": r.object_type_en,
+            "Name of correction": r.title_en,
+            "Task": r.explanation_en,
+            "Area": "Wiring",
+            "Priority": _legacy_priority(r.severity_en),
+            "Status": _legacy_status(r.severity_en),
+            "note": r.recommendation_en,
+        }
+        for r in records
+    ]
+    legacy_df = pd.DataFrame(legacy_rows, columns=LEGACY_EN_COLUMNS)
+
     return {
         OUTPUT_SHEET_CZ: cz_df,
         OUTPUT_SHEET_EN: en_df,
@@ -84,6 +119,7 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
         CRITICAL_SHEET_EN: en_df[en_df["Severity"] == "Critical"],
         NON_CRITICAL_SHEET_CZ: cz_df[cz_df["Závažnost"] == "Nekritické"],
         NON_CRITICAL_SHEET_EN: en_df[en_df["Severity"] == "Non-critical"],
+        LEGACY_INSPIRED_SHEET_EN: legacy_df,
     }
 
 
@@ -119,8 +155,13 @@ def _format_sheet(ws, sheet_name: str) -> None:
             break
 
     for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-        severity = str(row[0].value or "")
-        fill = CRITICAL_FILL if severity in {"Kritické", "Critical"} else NON_CRITICAL_FILL
+        lead_value = str(row[0].value or "")
+        if sheet_name == LEGACY_INSPIRED_SHEET_EN:
+            priority = str(row[5].value or "")
+            fill = CRITICAL_FILL if priority == "Not OK" else NON_CRITICAL_FILL
+        else:
+            fill = CRITICAL_FILL if lead_value in {"Kritické", "Critical"} else NON_CRITICAL_FILL
+
         for cell in row:
             cell.fill = fill
             cell.alignment = Alignment(vertical="top")
