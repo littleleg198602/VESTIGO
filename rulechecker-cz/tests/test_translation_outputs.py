@@ -14,6 +14,9 @@ class TestTranslationOutputs(unittest.TestCase):
             title_en="Wire and signal color consistency",
             explanation_cz="CZ vysvětlení",
             explanation_en="EN explanation",
+            object_type_cz="Vodič",
+            object_type_en="Wire",
+            wire_number="385",
             affected_cz="Leitung 385",
             affected_en="Leitung 385",
             where_cz="Skutečná barva (IST) = br/sw",
@@ -26,7 +29,9 @@ class TestTranslationOutputs(unittest.TestCase):
         cz = frames["Prehled_CZ"]
         en = frames["Overview_EN"]
 
+        self.assertEqual(cz.iloc[0]["Číslo drátu"], "385")
         self.assertEqual(cz.iloc[0]["Název chyby"], "Shoda barvy vodiče a signálu")
+        self.assertEqual(en.iloc[0]["Object type"], "Wire")
         self.assertEqual(en.iloc[0]["Error title"], "Wire and signal color consistency")
 
 

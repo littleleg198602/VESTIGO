@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from pathlib import Path
 
 import pandas as pd
@@ -19,6 +18,8 @@ from excel_parser import IssueRecord
 CZ_COLUMNS = [
     "Závažnost",
     "RC",
+    "Typ objektu",
+    "Číslo drátu",
     "Název chyby",
     "Vysvětlení",
     "Čeho se týká",
@@ -28,6 +29,8 @@ CZ_COLUMNS = [
 EN_COLUMNS = [
     "Severity",
     "RC",
+    "Object type",
+    "Wire number",
     "Error title",
     "Explanation",
     "Affected object",
@@ -46,6 +49,8 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
         {
             "Závažnost": r.severity_cz,
             "RC": r.rc,
+            "Typ objektu": r.object_type_cz,
+            "Číslo drátu": r.wire_number,
             "Název chyby": r.title_cz,
             "Vysvětlení": r.explanation_cz,
             "Čeho se týká": r.affected_cz,
@@ -58,6 +63,8 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
         {
             "Severity": r.severity_en,
             "RC": r.rc,
+            "Object type": r.object_type_en,
+            "Wire number": r.wire_number,
             "Error title": r.title_en,
             "Explanation": r.explanation_en,
             "Affected object": r.affected_en,

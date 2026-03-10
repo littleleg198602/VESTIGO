@@ -4,7 +4,7 @@ from typing import Any
 
 HEADER_TRANSLATIONS = {
     "Teilenummer der Leitung": ("Číslo dílu vodiče", "Wire part number"),
-    "Leitungsnummer": ("Číslo vedení", "Wire number"),
+    "Leitungsnummer": ("Číslo drátu", "Wire number"),
     "IST-Farbe": ("Skutečná barva (IST)", "Actual color (IST)"),
     "SOLL-Farbe": ("Požadovaná barva (SOLL)", "Required color (SOLL)"),
     "Farbe Ist": ("Skutečná barva (IST)", "Actual color (IST)"),

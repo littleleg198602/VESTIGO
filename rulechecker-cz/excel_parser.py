@@ -32,6 +32,9 @@ class IssueRecord:
     title_en: str
     explanation_cz: str
     explanation_en: str
+    object_type_cz: str
+    object_type_en: str
+    wire_number: str
     affected_cz: str
     affected_en: str
     where_cz: str
@@ -132,6 +135,9 @@ def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition, status_c
                 title_en=defn.title_en,
                 explanation_cz=defn.explanation_cz,
                 explanation_en=defn.explanation_en,
+                object_type_cz=defn.object_type_cz,
+                object_type_en=defn.object_type_en,
+                wire_number=", ".join(wires) if wires else "-",
                 affected_cz=f"Splice {splice_name}".strip(),
                 affected_en=f"Splice {splice_name}".strip(),
                 where_cz=where_cz,
@@ -168,6 +174,8 @@ def _build_record_from_row(
         where_cz = _compose_from_columns(row, defn.issue_columns, "cz")
         where_en = _compose_from_columns(row, defn.issue_columns, "en")
 
+    wire_number = _extract_wire_number(row)
+
     return IssueRecord(
         rc=rc,
         severity_cz=severity_cz,
@@ -176,6 +184,9 @@ def _build_record_from_row(
         title_en=defn.title_en,
         explanation_cz=defn.explanation_cz,
         explanation_en=defn.explanation_en,
+        object_type_cz=defn.object_type_cz,
+        object_type_en=defn.object_type_en,
+        wire_number=wire_number,
         affected_cz=affected_cz,
         affected_en=affected_en,
         where_cz=where_cz,
@@ -279,6 +290,23 @@ def _unique_values(df: pd.DataFrame, candidates: list[str]) -> list[str]:
     values = [clean_value(v) for v in df[col].tolist()]
     return sorted({v for v in values if v})
 
+
+
+
+def _extract_wire_number(row: pd.Series) -> str:
+    wire_col = _first_available_key(
+        row,
+        [
+            "Leitungsnummer",
+            "Leitung",
+            "Leitungen",
+            "Wire number",
+        ],
+    )
+    if not wire_col:
+        return "-"
+    value = clean_value(row.get(wire_col))
+    return value or "-"
 
 def _first_available_key(row: pd.Series, candidates: list[str]) -> str | None:
     normalized_map = {_normalize_header(str(c)): str(c) for c in row.index}
