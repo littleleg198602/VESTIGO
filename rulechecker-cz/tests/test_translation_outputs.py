@@ -34,6 +34,43 @@ class TestTranslationOutputs(unittest.TestCase):
         self.assertEqual(en.iloc[0]["Object type"], "Wire")
         self.assertEqual(en.iloc[0]["Error title"], "Wire and signal color consistency")
 
+    def test_legacy_inspired_frame_columns_and_values(self):
+        record = IssueRecord(
+            rc=1,
+            severity_cz="Nekritické",
+            severity_en="Non-critical",
+            title_cz="Kontrola",
+            title_en="Check",
+            explanation_cz="CZ",
+            explanation_en="EN task",
+            object_type_cz="Vodič",
+            object_type_en="Wire",
+            wire_number="100",
+            affected_cz="A",
+            affected_en="A",
+            where_cz="B",
+            where_en="B",
+            recommendation_cz="CZ rec",
+            recommendation_en="Use same WCS",
+        )
+
+        frames = build_output_frames([record])
+        legacy = frames["LegacyInspired_EN"]
+
+        self.assertEqual(legacy.columns.tolist(), [
+            "Number of mistake",
+            "Type of part",
+            "Name of correction",
+            "Task",
+            "Area",
+            "Priority",
+            "Status",
+            "note",
+        ])
+        self.assertEqual(legacy.iloc[0]["Number of mistake"], "RC 1")
+        self.assertEqual(legacy.iloc[0]["Priority"], "Warning")
+        self.assertEqual(legacy.iloc[0]["Status"], "done")
+
 
 if __name__ == "__main__":
     unittest.main()
