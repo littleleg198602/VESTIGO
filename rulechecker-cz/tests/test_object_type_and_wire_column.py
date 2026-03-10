@@ -18,7 +18,7 @@ class TestObjectTypeAndWireColumn(unittest.TestCase):
         ])
         records = parse_rc_sheet(df, 1, get_rc_definition(1))
         self.assertEqual(records[0].wire_number, "904138")
-        self.assertEqual(records[0].object_type_cz, "Vodič")
+        self.assertEqual(records[0].object_type_cz, "Drát")
 
         frames = build_output_frames(records)
         self.assertIn("Číslo drátu", frames["Prehled_CZ"].columns)

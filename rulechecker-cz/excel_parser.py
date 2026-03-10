@@ -10,7 +10,7 @@ import pandas as pd
 from config import HEADER_STATUS_NAME, PROBLEM_STATUSES
 from rc_maps import RCDefinition, get_rc_definition
 from severity import map_status_to_severity
-from translators import clean_value, translate_header
+from translators import clean_value, translate_header, translate_value
 from utils import extract_rc_number
 
 LOG = logging.getLogger(__name__)
@@ -204,7 +204,8 @@ def _compose_from_columns(row: pd.Series, columns: list[str], lang: str) -> str:
         if not value:
             continue
         translated = translate_header(col, lang)
-        chunks.append(f"{translated} = {value}")
+        display_value = translate_value(col, value, lang)
+        chunks.append(f"{translated} = {display_value}")
     return "; ".join(chunks) if chunks else "N/A"
 
 

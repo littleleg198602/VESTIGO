@@ -14,7 +14,7 @@ class TestTranslationOutputs(unittest.TestCase):
             title_en="Wire and signal color consistency",
             explanation_cz="CZ vysvětlení",
             explanation_en="EN explanation",
-            object_type_cz="Vodič",
+            object_type_cz="Drát",
             object_type_en="Wire",
             wire_number="385",
             affected_cz="Leitung 385",
