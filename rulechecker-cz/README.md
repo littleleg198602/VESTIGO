@@ -7,6 +7,7 @@ Nástroj pro každý vstupní report vytvoří nový výstupní `.xlsx` s přehl
 
 - Prochází všechny `.xlsx` soubory ve vstupním adresáři.
 - Přeskakuje již vygenerované výstupy (`__prehled_CZ...`, `__prehled_CZ_EN...`, `__overview...`).
+- Automaticky hledá řádek hlavičky i v listech, kde tabulka nezačíná na prvním řádku (typické pro exporty s metadaty nahoře).
 - V listu RC zpracovává jen řádky se stavem:
   - `Warnung`
   - `Nicht in Ordnung`

@@ -1,20 +1,26 @@
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
 import pandas as pd
 
-from config import HEADER_PARAM_NAME, HEADER_STATUS_NAME, PROBLEM_STATUSES
+from config import HEADER_STATUS_NAME, PROBLEM_STATUSES
 from rc_maps import RCDefinition, get_rc_definition
 from severity import map_status_to_severity
 from translators import clean_value, translate_header
 from utils import extract_rc_number
 
 LOG = logging.getLogger(__name__)
+
+STATUS_HEADER_CANDIDATES = [
+    "Einschätzung",
+    "Einschaetzung",
+    "Bewertung",
+    "Status",
+]
 
 
 @dataclass
@@ -46,32 +52,40 @@ def parse_workbook(path: Path) -> list[IssueRecord]:
         rc = extract_rc_number(sheet)
         if rc is None:
             continue
-        df = _safe_read_sheet(xls, sheet)
-        if df is None or HEADER_STATUS_NAME not in df.columns:
+
+        df = _safe_read_rc_sheet(xls, sheet)
+        if df is None:
             continue
+
+        status_col = _resolve_status_column(df)
+        if not status_col:
+            LOG.warning("List %s nemá rozpoznatelný sloupec stavu.", sheet)
+            continue
+
         defn = get_rc_definition(rc)
-        records.extend(parse_rc_sheet(df, rc, defn))
+        records.extend(parse_rc_sheet(df, rc, defn, status_col))
+
     return records
 
 
-def parse_rc_sheet(df: pd.DataFrame, rc: int, defn: RCDefinition) -> list[IssueRecord]:
-    filtered = df[df[HEADER_STATUS_NAME].astype(str).str.strip().isin(PROBLEM_STATUSES)].copy()
+def parse_rc_sheet(df: pd.DataFrame, rc: int, defn: RCDefinition, status_col: str = HEADER_STATUS_NAME) -> list[IssueRecord]:
+    filtered = df[df[status_col].astype(str).str.strip().isin(PROBLEM_STATUSES)].copy()
     if filtered.empty:
         return []
 
     if defn.handler == "rc121":
-        return _parse_rc121_grouped(filtered, rc, defn)
+        return _parse_rc121_grouped(filtered, rc, defn, status_col)
 
     out: list[IssueRecord] = []
     for _, row in filtered.iterrows():
-        severity = map_status_to_severity(clean_value(row.get(HEADER_STATUS_NAME)))
+        severity = map_status_to_severity(clean_value(row.get(status_col)))
         if not severity:
             continue
         out.append(_build_record_from_row(row, rc, defn, severity.cz, severity.en))
     return out
 
 
-def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition) -> list[IssueRecord]:
+def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition, status_col: str) -> list[IssueRecord]:
     key_splice = _find_col(df.columns, ["Splice", "Spleiß", "Splice-Name"])
     key_vobes = _find_col(df.columns, ["VOBES-ID", "VOBES"])
     if not key_splice:
@@ -83,11 +97,12 @@ def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition) -> list[
 
     groups = df.groupby([key_splice, key_vobes], dropna=False)
     out: list[IssueRecord] = []
-    for (_, _), group in groups:
-        status = clean_value(group.iloc[0].get(HEADER_STATUS_NAME))
+    for _, group in groups:
+        status = clean_value(group.iloc[0].get(status_col))
         severity = map_status_to_severity(status)
         if not severity:
             continue
+
         wires = _unique_values(group, ["Leitungsnummer", "Leitung"])
         color_ist = _unique_values(group, ["Farbe Ist", "IST-Farbe"])
         color_soll = _unique_values(group, ["Farbe Soll", "SOLL-Farbe"])
@@ -139,18 +154,16 @@ def _build_record_from_row(
     affected_en = _compose_from_columns(row, defn.affected_columns, "en")
 
     if defn.handler == "rc1":
-        part_no = clean_value(row.get("Teilenummer der Leitung"))
-        where_cz = f"Číslo dílu vodiče = {part_no}"
-        where_en = f"Wire part number = {part_no}"
+        part_col = _first_available_key(row, ["Teilenummer der Leitung", "Teilenummer", "Part number"])
+        part_no = clean_value(row.get(part_col)) if part_col else ""
+        where_cz = f"Číslo dílu vodiče = {part_no or '-'}"
+        where_en = f"Wire part number = {part_no or '-'}"
     elif defn.handler == "rc106":
-        ist = clean_value(row.get("IST-Farbe"))
-        soll = clean_value(row.get("SOLL-Farbe"))
-        match = clean_value(row.get("Farben-Übereinstimmung"))
-        where_cz = f"Skutečná barva (IST) = {ist}; Požadovaná barva (SOLL) = {soll}; Shoda barev = {match}"
-        where_en = f"Actual color (IST) = {ist}; Required color (SOLL) = {soll}; Color match = {match}"
-    elif defn.handler == "rc110":
-        where_cz = _compose_from_columns(row, defn.issue_columns, "cz")
-        where_en = _compose_from_columns(row, defn.issue_columns, "en")
+        ist = clean_value(row.get(_first_available_key(row, ["IST-Farbe", "Farbe Ist"]) or ""))
+        soll = clean_value(row.get(_first_available_key(row, ["SOLL-Farbe", "Farbe Soll"]) or ""))
+        match = clean_value(row.get(_first_available_key(row, ["Farben-Übereinstimmung", "Farbübereinstimmung"]) or ""))
+        where_cz = f"Skutečná barva (IST) = {ist or '-'}; Požadovaná barva (SOLL) = {soll or '-'}; Shoda barev = {match or '-'}"
+        where_en = f"Actual color (IST) = {ist or '-'}; Required color (SOLL) = {soll or '-'}; Color match = {match or '-'}"
     else:
         where_cz = _compose_from_columns(row, defn.issue_columns, "cz")
         where_en = _compose_from_columns(row, defn.issue_columns, "en")
@@ -175,26 +188,85 @@ def _build_record_from_row(
 def _compose_from_columns(row: pd.Series, columns: list[str], lang: str) -> str:
     chunks = []
     for col in columns:
-        value = clean_value(row.get(col))
+        actual_col = _first_available_key(row, [col])
+        value = clean_value(row.get(actual_col)) if actual_col else ""
         if not value:
             continue
         translated = translate_header(col, lang)
         chunks.append(f"{translated} = {value}")
-    return "; ".join(chunks) if chunks else ("N/A" if lang == "en" else "N/A")
+    return "; ".join(chunks) if chunks else "N/A"
 
 
-def _safe_read_sheet(xls: pd.ExcelFile, sheet_name: str) -> pd.DataFrame | None:
+def _safe_read_rc_sheet(xls: pd.ExcelFile, sheet_name: str) -> pd.DataFrame | None:
     try:
-        return pd.read_excel(xls, sheet_name=sheet_name)
+        # 1) raw načtení bez headeru pro detekci hlavičky v různých řádcích
+        raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
     except Exception as exc:
         LOG.warning("Nelze načíst list %s: %s", sheet_name, exc)
         return None
 
+    header_idx = _detect_header_row(raw)
+    if header_idx is None:
+        return None
+
+    header_values = [clean_value(v) for v in raw.iloc[header_idx].tolist()]
+    data = raw.iloc[header_idx + 1 :].copy()
+    data.columns = _make_unique_headers(header_values)
+    data = data.dropna(how="all")
+    return data.reset_index(drop=True)
+
+
+def _detect_header_row(raw: pd.DataFrame) -> int | None:
+    max_rows = min(len(raw), 80)
+    for idx in range(max_rows):
+        row = [clean_value(v) for v in raw.iloc[idx].tolist()]
+        if _row_contains_status_header(row):
+            return idx
+    return None
+
+
+def _row_contains_status_header(row_values: list[str]) -> bool:
+    normalized = {_normalize_header(v) for v in row_values if v}
+    for candidate in STATUS_HEADER_CANDIDATES:
+        if _normalize_header(candidate) in normalized:
+            return True
+    return False
+
+
+def _resolve_status_column(df: pd.DataFrame) -> str | None:
+    normalized_map = {_normalize_header(str(c)): str(c) for c in df.columns}
+    for candidate in STATUS_HEADER_CANDIDATES:
+        key = _normalize_header(candidate)
+        if key in normalized_map:
+            return normalized_map[key]
+    # fallback na původní název kvůli kompatibilitě
+    if HEADER_STATUS_NAME in df.columns:
+        return HEADER_STATUS_NAME
+    return None
+
+
+def _make_unique_headers(headers: list[str]) -> list[str]:
+    counts: dict[str, int] = {}
+    result: list[str] = []
+    for idx, h in enumerate(headers):
+        base = h or f"col_{idx + 1}"
+        count = counts.get(base, 0)
+        if count == 0:
+            result.append(base)
+        else:
+            result.append(f"{base}__{count}")
+        counts[base] = count + 1
+    return result
+
+
+def _normalize_header(value: str) -> str:
+    return " ".join((value or "").replace("\n", " ").lower().split())
+
 
 def _find_col(columns: Iterable[str], candidates: list[str]) -> str | None:
-    lowered = {str(c).lower(): c for c in columns}
+    lowered = {_normalize_header(str(c)): str(c) for c in columns}
     for candidate in candidates:
-        col = lowered.get(candidate.lower())
+        col = lowered.get(_normalize_header(candidate))
         if col is not None:
             return str(col)
     return None
@@ -206,3 +278,12 @@ def _unique_values(df: pd.DataFrame, candidates: list[str]) -> list[str]:
         return []
     values = [clean_value(v) for v in df[col].tolist()]
     return sorted({v for v in values if v})
+
+
+def _first_available_key(row: pd.Series, candidates: list[str]) -> str | None:
+    normalized_map = {_normalize_header(str(c)): str(c) for c in row.index}
+    for candidate in candidates:
+        key = normalized_map.get(_normalize_header(candidate))
+        if key:
+            return key
+    return None
