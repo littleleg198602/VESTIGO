@@ -26,6 +26,7 @@ Nástroj pro každý vstupní report vytvoří nový výstupní `.xlsx` s přehl
   - `Critical_EN`
   - `Nekriticke_CZ`
   - `NonCritical_EN`
+  - `LegacyInspired_EN` (anglický list inspirovaný dřívějším "Prehled chyb" formátem)
 
 ## Instalace
 
@@ -89,6 +90,11 @@ Mapování stavů je v `severity.py`:
   - `Overview_EN` (anglicky)
 - Překlady hlaviček a textových labelů jsou centralizované v `translators.py`.
 - Listy jsou jazykově konzistentní (bez mixu čeština/angličtina/němčina).
+
+- Nový list `LegacyInspired_EN` přidává známé sloupce z historické šablony:
+  - `Number of mistake`, `Type of part`, `Name of correction`, `Task`, `Area`, `Priority`, `Status`, `note`
+  - `Priority` je mapované z vážnosti (`Critical -> Not OK`, `Non-critical -> Warning`)
+  - `Status` je orientačně předvyplněn (`Critical -> in progress`, `Non-critical -> done`)
 
 ## Formátování výstupu
 
