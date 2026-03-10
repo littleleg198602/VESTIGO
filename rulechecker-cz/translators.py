@@ -19,7 +19,7 @@ HEADER_TRANSLATIONS = {
     "Ergebnis Hinweis": ("Výsledek", "Result note"),
     "Signalname": ("Název signálu", "Signal name"),
     "Signal": ("Signál", "Signal"),
-    "Sonderleitung": ("Speciální vedení", "Special cable"),
+    "Sonderleitung": ("Speciální drát", "Special cable"),
     "Leitungslänge [mm]": ("Délka vedení [mm]", "Wire length [mm]"),
     "Σ Leitungslänge [mm]": ("Σ délka vedení [mm]", "Σ wire length [mm]"),
     "Abstand Endpunkte [mm]": ("Vzdálenost koncových bodů [mm]", "Distance between endpoints [mm]"),
