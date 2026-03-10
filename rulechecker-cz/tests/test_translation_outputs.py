@@ -29,7 +29,7 @@ class TestTranslationOutputs(unittest.TestCase):
         cz = frames["Prehled_CZ"]
         en = frames["Overview_EN"]
 
-        self.assertEqual(cz.iloc[0]["Číslo drátu"], "385")
+        self.assertEqual(cz.iloc[0]["Identifikátor"], "385")
         self.assertEqual(cz.iloc[0]["Název chyby"], "Shoda barvy drátu a signálu")
         self.assertEqual(en.iloc[0]["Object type"], "Wire")
         self.assertEqual(en.iloc[0]["Error title"], "Wire and signal color consistency")

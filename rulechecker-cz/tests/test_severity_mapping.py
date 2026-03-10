@@ -9,6 +9,9 @@ class TestSeverityMapping(unittest.TestCase):
         self.assertEqual(map_status_to_severity("Nicht in Ordnung").en, "Critical")
         self.assertEqual(map_status_to_severity("Warnung").cz, "Nekritické")
         self.assertEqual(map_status_to_severity("Zu prüfen").en, "Non-critical")
+        self.assertEqual(map_status_to_severity("  fehler ").cz, "Kritické")
+        self.assertEqual(map_status_to_severity("Not OK").en, "Critical")
+        self.assertEqual(map_status_to_severity("warning").cz, "Nekritické")
         self.assertIsNone(map_status_to_severity("In Ordnung"))
 
 

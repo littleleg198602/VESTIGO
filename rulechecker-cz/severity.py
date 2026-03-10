@@ -10,12 +10,21 @@ class SeverityLabels:
 
 
 STATE_TO_SEVERITY = {
-    "Fehler": SeverityLabels("Kritické", "Critical"),
-    "Nicht in Ordnung": SeverityLabels("Kritické", "Critical"),
-    "Warnung": SeverityLabels("Nekritické", "Non-critical"),
-    "Zu prüfen": SeverityLabels("Nekritické", "Non-critical"),
+    "fehler": SeverityLabels("Kritické", "Critical"),
+    "nicht in ordnung": SeverityLabels("Kritické", "Critical"),
+    "warnung": SeverityLabels("Nekritické", "Non-critical"),
+    "zu prüfen": SeverityLabels("Nekritické", "Non-critical"),
+    "zu pruefen": SeverityLabels("Nekritické", "Non-critical"),
+    "error": SeverityLabels("Kritické", "Critical"),
+    "not ok": SeverityLabels("Kritické", "Critical"),
+    "warning": SeverityLabels("Nekritické", "Non-critical"),
+    "to check": SeverityLabels("Nekritické", "Non-critical"),
 }
 
 
+def _normalize_status(status: str) -> str:
+    return " ".join((status or "").strip().lower().split())
+
+
 def map_status_to_severity(status: str) -> SeverityLabels | None:
-    return STATE_TO_SEVERITY.get((status or "").strip())
+    return STATE_TO_SEVERITY.get(_normalize_status(status))
