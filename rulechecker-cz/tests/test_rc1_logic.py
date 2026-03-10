@@ -20,7 +20,7 @@ class TestRC1Logic(unittest.TestCase):
         )
         out = parse_rc_sheet(df, 1, get_rc_definition(1))
         self.assertEqual(len(out), 1)
-        self.assertEqual(out[0].where_cz, "Číslo dílu vodiče = N_037_004_0")
+        self.assertEqual(out[0].where_cz, "Číslo dílu drátu = N_037_004_0")
         self.assertEqual(out[0].where_en, "Wire part number = N_037_004_0")
 
 

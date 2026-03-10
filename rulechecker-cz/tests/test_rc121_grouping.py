@@ -32,7 +32,7 @@ class TestRC121Grouping(unittest.TestCase):
         )
         out = parse_rc_sheet(df, 121, get_rc_definition(121))
         self.assertEqual(len(out), 1)
-        self.assertIn("Dotčené vodiče = 23001, 23002", out[0].where_cz)
+        self.assertIn("Dotčené dráty = 23001, 23002", out[0].where_cz)
         self.assertIn("Affected wires = 23001, 23002", out[0].where_en)
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 HEADER_TRANSLATIONS = {
-    "Teilenummer der Leitung": ("Číslo dílu vodiče", "Wire part number"),
+    "Teilenummer der Leitung": ("Číslo dílu drátu", "Wire part number"),
     "Leitungsnummer": ("Číslo drátu", "Wire number"),
     "IST-Farbe": ("Skutečná barva (IST)", "Actual color (IST)"),
     "SOLL-Farbe": ("Požadovaná barva (SOLL)", "Required color (SOLL)"),
@@ -14,7 +14,7 @@ HEADER_TRANSLATIONS = {
     "Meldung": ("Zpráva", "Message"),
     "Startpunkt": ("Start", "Start point"),
     "Endpunkt": ("Konec", "End point"),
-    "Leitungen": ("Vodiče", "Wires"),
+    "Leitungen": ("Dráty", "Wires"),
     "Leitungslänge": ("Délka vedení", "Wire length"),
     "Ergebnis Hinweis": ("Výsledek", "Result note"),
     "Signalname": ("Název signálu", "Signal name"),

@@ -114,7 +114,7 @@ def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition, status_c
         vobes_value = clean_value(group.iloc[0].get(key_vobes))
 
         where_cz = (
-            f"VOBES-ID = {vobes_value}; Dotčené vodiče = {', '.join(wires) or '-'}; "
+            f"VOBES-ID = {vobes_value}; Dotčené dráty = {', '.join(wires) or '-'}; "
             f"Skutečné barvy = {', '.join(color_ist) or '-'}; "
             f"Požadované barvy = {', '.join(color_soll) or '-'}; "
             f"Potenciály = {', '.join(potentials) or '-'}"
@@ -162,7 +162,7 @@ def _build_record_from_row(
     if defn.handler == "rc1":
         part_col = _first_available_key(row, ["Teilenummer der Leitung", "Teilenummer", "Part number"])
         part_no = clean_value(row.get(part_col)) if part_col else ""
-        where_cz = f"Číslo dílu vodiče = {part_no or '-'}"
+        where_cz = f"Číslo dílu drátu = {part_no or '-'}"
         where_en = f"Wire part number = {part_no or '-'}"
     elif defn.handler == "rc106":
         ist = clean_value(row.get(_first_available_key(row, ["IST-Farbe", "Farbe Ist"]) or ""))
