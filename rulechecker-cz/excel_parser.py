@@ -7,7 +7,7 @@ from typing import Iterable
 
 import pandas as pd
 
-from config import HEADER_STATUS_NAME, PROBLEM_STATUSES
+from config import HEADER_STATUS_NAME
 from rc_maps import RCDefinition, get_rc_definition
 from severity import map_status_to_severity
 from translators import clean_value, translate_header, translate_value
@@ -72,7 +72,8 @@ def parse_workbook(path: Path) -> list[IssueRecord]:
 
 
 def parse_rc_sheet(df: pd.DataFrame, rc: int, defn: RCDefinition, status_col: str = HEADER_STATUS_NAME) -> list[IssueRecord]:
-    filtered = df[df[status_col].astype(str).str.strip().isin(PROBLEM_STATUSES)].copy()
+    severity_series = df[status_col].map(lambda value: map_status_to_severity(clean_value(value)))
+    filtered = df[severity_series.notna()].copy()
     if filtered.empty:
         return []
 
@@ -80,8 +81,8 @@ def parse_rc_sheet(df: pd.DataFrame, rc: int, defn: RCDefinition, status_col: st
         return _parse_rc121_grouped(filtered, rc, defn, status_col)
 
     out: list[IssueRecord] = []
-    for _, row in filtered.iterrows():
-        severity = map_status_to_severity(clean_value(row.get(status_col)))
+    for idx, row in filtered.iterrows():
+        severity = severity_series.loc[idx]
         if not severity:
             continue
         out.append(_build_record_from_row(row, rc, defn, severity.cz, severity.en))
