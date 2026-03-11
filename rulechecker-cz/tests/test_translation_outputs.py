@@ -33,6 +33,12 @@ class TestTranslationOutputs(unittest.TestCase):
         self.assertEqual(cz.iloc[0]["Název chyby"], "Shoda barvy drátu a signálu")
         self.assertEqual(en.iloc[0]["Object type"], "Wire")
         self.assertEqual(en.iloc[0]["Error title"], "Wire and signal color consistency")
+        self.assertEqual(cz.iloc[0]["Priority"], "Not OK")
+        self.assertEqual(cz.iloc[0]["Progress"], "")
+        self.assertEqual(cz.iloc[0]["Solution"], "")
+        self.assertEqual(en.iloc[0]["Priority"], "Not OK")
+        self.assertEqual(en.iloc[0]["Progress"], "")
+        self.assertEqual(en.iloc[0]["Solution"], "")
 
     def test_legacy_inspired_frame_columns_and_values(self):
         record = IssueRecord(

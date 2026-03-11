@@ -80,8 +80,8 @@ Mapování stavů je v `severity.py`:
 
 ## Jak funguje CZ/EN výstup
 
-- České listy obsahují i samostatné sloupce `Typ objektu` a `Identifikátor`.
-- Anglické listy obsahují i samostatné sloupce `Object type` a `Identifier`.
+- České listy obsahují i samostatné sloupce `Typ objektu`, `Identifikátor`, `Priority`, `Progress`, `Solution`.
+- Anglické listy obsahují i samostatné sloupce `Object type`, `Identifier`, `Priority`, `Progress`, `Solution`.
 - `Leitungsnummer` je mapováno do obecného sloupce `Identifikátor` (pro vyhledání čísla drátu, názvu konektoru nebo jiného klíče objektu).
 
 - Parser vytváří interní datový model (`IssueRecord`) v `excel_parser.py`.

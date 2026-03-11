@@ -26,6 +26,9 @@ CZ_COLUMNS = [
     "Čeho se týká",
     "Kde je chyba",
     "Doporučení",
+    "Priority",
+    "Progress",
+    "Solution",
 ]
 EN_COLUMNS = [
     "Severity",
@@ -37,6 +40,9 @@ EN_COLUMNS = [
     "Affected object",
     "Where is the issue",
     "Recommendation",
+    "Priority",
+    "Progress",
+    "Solution",
 ]
 
 LEGACY_EN_COLUMNS = [
@@ -97,6 +103,9 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Čeho se týká": r.affected_cz,
             "Kde je chyba": r.where_cz,
             "Doporučení": r.recommendation_cz,
+            "Priority": _legacy_priority(r.severity_en),
+            "Progress": "",
+            "Solution": "",
         }
         for r in records
     ]
@@ -111,6 +120,9 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Affected object": r.affected_en,
             "Where is the issue": r.where_en,
             "Recommendation": r.recommendation_en,
+            "Priority": _legacy_priority(r.severity_en),
+            "Progress": "",
+            "Solution": "",
         }
         for r in records
     ]
