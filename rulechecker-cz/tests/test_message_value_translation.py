@@ -16,5 +16,15 @@ class TestMessageValueTranslation(unittest.TestCase):
         self.assertIn("Linked accessories", en)
 
 
+
+    def test_translates_splice_bundle_length_sentence(self):
+        source = "Bündellänge am Splice darf nicht länger als 100 mm sein"
+
+        cz = translate_value("Meldung", source, "cz")
+        en = translate_value("Meldung", source, "en")
+
+        self.assertIn("Délka svazku na spoji nesmí být delší než 100 mm", cz)
+        self.assertIn("Bundle length at splice must not exceed 100 mm", en)
+
 if __name__ == "__main__":
     unittest.main()
