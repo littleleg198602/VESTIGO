@@ -127,6 +127,7 @@ def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition, status_c
             f"Potentials = {', '.join(potentials) or '-'}"
         )
 
+        identifier = ", ".join(wires) if wires else (splice_name or vobes_value or "-")
         out.append(
             IssueRecord(
                 rc=rc,
@@ -138,7 +139,7 @@ def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition, status_c
                 explanation_en=defn.explanation_en,
                 object_type_cz=defn.object_type_cz,
                 object_type_en=defn.object_type_en,
-                wire_number=", ".join(wires) if wires else "-",
+                wire_number=identifier,
                 affected_cz=f"Splice {splice_name}".strip(),
                 affected_en=f"Splice {splice_name}".strip(),
                 where_cz=where_cz,
@@ -301,6 +302,9 @@ def _extract_wire_number(row: pd.Series) -> str:
         "Leitung",
         "Leitungen",
         "Wire number",
+        "Stecker",
+        "Steckername",
+        "Connector",
         "Endpunkt",
         "Startpunkt",
         "Signalname",

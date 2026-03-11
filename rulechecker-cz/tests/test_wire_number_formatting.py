@@ -78,6 +78,18 @@ class TestWireNumberFormatting(unittest.TestCase):
 
         self.assertEqual(records[0].wire_number, "X1\n12")
 
+    def test_uses_stecker_name_when_wire_number_missing(self):
+        df = pd.DataFrame([
+            {
+                "Einschätzung": "Nicht in Ordnung",
+                "Stecker": "XA.GX1.1_XA.GX1.2",
+            }
+        ])
+
+        records = parse_rc_sheet(df, 115, get_rc_definition(115))
+
+        self.assertEqual(records[0].wire_number, "XA.GX1.1_XA.GX1.2")
+
 
 if __name__ == "__main__":
     unittest.main()
