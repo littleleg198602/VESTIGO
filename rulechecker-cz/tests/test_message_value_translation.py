@@ -26,5 +26,20 @@ class TestMessageValueTranslation(unittest.TestCase):
         self.assertIn("Délka svazku na spoji nesmí být delší než 100 mm", cz)
         self.assertIn("Bundle length at splice must not exceed 100 mm", en)
 
+
+    def test_translates_lin_grounding_messages(self):
+        source = (
+            "Stecker hat keine Masseleitung. Teilnehmer des LIN-Busses sind mit unterschiedlichen "
+            "Massebolzen verbunden."
+        )
+
+        cz = translate_value("Meldung", source, "cz")
+        en = translate_value("Meldung", source, "en")
+
+        self.assertIn("Konektor nemá zemnicí vedení.", cz)
+        self.assertIn("Účastníci LIN sběrnice jsou připojeni na různé zemnící body.", cz)
+        self.assertIn("Connector has no ground wire.", en)
+        self.assertIn("LIN bus participants are connected to different ground points.", en)
+
 if __name__ == "__main__":
     unittest.main()

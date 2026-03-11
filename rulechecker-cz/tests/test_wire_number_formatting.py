@@ -114,5 +114,20 @@ class TestWireNumberFormatting(unittest.TestCase):
         self.assertEqual(records[0].wire_number, "SI_LVIR_F16")
 
 
+
+    def test_does_not_return_nan_as_identifier(self):
+        df = pd.DataFrame([
+            {
+                "Einschätzung": "Nicht in Ordnung",
+                "Leitungsnummer": float("nan"),
+                "VOBES-ID": float("nan"),
+                "Bauteil": "XA.810.1",
+            }
+        ])
+
+        records = parse_rc_sheet(df, 338, get_rc_definition(338))
+
+        self.assertEqual(records[0].wire_number, "XA.810.1")
+
 if __name__ == "__main__":
     unittest.main()

@@ -38,5 +38,29 @@ class TestObjectTypeAndWireColumn(unittest.TestCase):
         self.assertEqual(records[0].object_type_cz, "Pojistka")
         self.assertEqual(records[0].wire_number, "SI_LVIR_F16")
 
+
+    def test_rc338_prefers_connector_identifier_and_type(self):
+        df = pd.DataFrame([
+            {
+                "Einschätzung": "Nicht in Ordnung",
+                "Bauteil": "XA.810.1",
+                "VOBES-ID": "",
+                "Verwendungsstelle": "810.1",
+                "Meldung": "Verpolung ist unbekannt.",
+            }
+        ])
+        records = parse_rc_sheet(df, 338, get_rc_definition(338))
+        self.assertEqual(records[0].object_type_cz, "Konektor")
+        self.assertEqual(records[0].wire_number, "XA.810.1")
+        self.assertIn("Message", records[0].where_en)
+
+
+    def test_rc1007_uses_connector_usage_metadata(self):
+        defn = get_rc_definition(1007)
+        self.assertEqual(defn.object_type_cz, "Konektor")
+        self.assertEqual(defn.object_type_en, "Connector")
+        self.assertIn("Verwendungsstelle", defn.affected_columns)
+        self.assertIn("mateřském seznamu", defn.explanation_cz)
+
 if __name__ == "__main__":
     unittest.main()

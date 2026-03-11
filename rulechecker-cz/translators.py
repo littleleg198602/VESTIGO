@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import math
+
 HEADER_TRANSLATIONS = {
     "Teilenummer der Leitung": ("Číslo dílu drátu", "Wire part number"),
     "Leitungsnummer": ("Číslo drátu", "Wire number"),
@@ -40,9 +42,15 @@ def translate_header(header: str, lang: str) -> str:
 def clean_value(value: Any) -> str:
     if value is None:
         return ""
-    if isinstance(value, float) and value.is_integer():
-        return str(int(value))
-    return str(value).strip()
+    if isinstance(value, float):
+        if math.isnan(value):
+            return ""
+        if value.is_integer():
+            return str(int(value))
+    text_value = str(value).strip()
+    if text_value.lower() in {"nan", "none"}:
+        return ""
+    return text_value
 
 
 MESSAGE_VALUE_REPLACEMENTS = {
@@ -57,6 +65,22 @@ MESSAGE_VALUE_REPLACEMENTS = {
     "bündellänge am splice darf nicht länger als 100 mm sein": (
         "Délka svazku na spoji nesmí být delší než 100 mm",
         "Bundle length at splice must not exceed 100 mm",
+    ),
+    "verpolung ist unbekannt.": (
+        "Přepólování je neznámé.",
+        "Reverse polarity is unknown.",
+    ),
+    "die leitungsfarbe entspricht nicht der vorgabe aus dem lastenheft": (
+        "Barva vodiče neodpovídá požadavku ze specifikace.",
+        "Wire color does not match the specification requirement.",
+    ),
+    "teilnehmer des lin-busses sind mit unterschiedlichen massebolzen verbunden.": (
+        "Účastníci LIN sběrnice jsou připojeni na různé zemnící body.",
+        "LIN bus participants are connected to different ground points.",
+    ),
+    "stecker hat keine masseleitung.": (
+        "Konektor nemá zemnicí vedení.",
+        "Connector has no ground wire.",
     ),
 }
 

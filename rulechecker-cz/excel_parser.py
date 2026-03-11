@@ -323,6 +323,7 @@ def _extract_wire_number(row: pd.Series) -> str:
 
     preserve_columns = [
         "Stecker",
+        "Bauteil",
         "Steckername",
         "Connector",
         "Sicherungsname",
@@ -335,6 +336,7 @@ def _extract_wire_number(row: pd.Series) -> str:
         "Sonderleitung",
         "Splice",
         "VOBES-ID",
+        "Verwendungsstelle",
         "Potential",
     ]
     for column in preserve_columns:
