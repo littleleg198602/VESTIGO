@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import math
+
 HEADER_TRANSLATIONS = {
     "Teilenummer der Leitung": ("Číslo dílu drátu", "Wire part number"),
     "Leitungsnummer": ("Číslo drátu", "Wire number"),
@@ -40,9 +42,15 @@ def translate_header(header: str, lang: str) -> str:
 def clean_value(value: Any) -> str:
     if value is None:
         return ""
-    if isinstance(value, float) and value.is_integer():
-        return str(int(value))
-    return str(value).strip()
+    if isinstance(value, float):
+        if math.isnan(value):
+            return ""
+        if value.is_integer():
+            return str(int(value))
+    text_value = str(value).strip()
+    if text_value.lower() in {"nan", "none"}:
+        return ""
+    return text_value
 
 
 MESSAGE_VALUE_REPLACEMENTS = {
@@ -53,6 +61,26 @@ MESSAGE_VALUE_REPLACEMENTS = {
     "verknüpfte accessories": (
         "Propojené příslušenství",
         "Linked accessories",
+    ),
+    "bündellänge am splice darf nicht länger als 100 mm sein": (
+        "Délka svazku na spoji nesmí být delší než 100 mm",
+        "Bundle length at splice must not exceed 100 mm",
+    ),
+    "verpolung ist unbekannt.": (
+        "Přepólování je neznámé.",
+        "Reverse polarity is unknown.",
+    ),
+    "die leitungsfarbe entspricht nicht der vorgabe aus dem lastenheft": (
+        "Barva vodiče neodpovídá požadavku ze specifikace.",
+        "Wire color does not match the specification requirement.",
+    ),
+    "teilnehmer des lin-busses sind mit unterschiedlichen massebolzen verbunden.": (
+        "Účastníci LIN sběrnice jsou připojeni na různé zemnící body.",
+        "LIN bus participants are connected to different ground points.",
+    ),
+    "stecker hat keine masseleitung.": (
+        "Konektor nemá zemnicí vedení.",
+        "Connector has no ground wire.",
     ),
 }
 
@@ -75,4 +103,53 @@ def translate_value(header: str, value: str, lang: str) -> str:
             end = start + len(source)
             translated = translated[:start] + target + translated[end:]
             lowered = translated.lower()
+    return translated
+
+
+METADATA_TEXT_REPLACEMENTS = {
+    "leitung: überprüfung der längendifferenz zwischen den sonderleitungscores": (
+        "Vedení: kontrola rozdílu délky mezi jádry speciálního vedení",
+        "Wire: check of length difference between special-cable cores",
+    ),
+    "splice: überprüfung der bündellänge am splice": (
+        "Splice: kontrola délky svazku na spoji",
+        "Splice: check of bundle length at splice",
+    ),
+    "stecker: überprüfung der 3d-ausrichtung von (gedichteten) steckern": (
+        "Konektor: kontrola 3D orientace (utěsněných) konektorů",
+        "Connector: check of 3D orientation of (sealed) connectors",
+    ),
+    "prüft, ob die längendifferenz zwischen den sonderleitungscores": (
+        "Kontrola ověřuje, zda rozdíl délky mezi jádry speciálního vedení",
+        "Checks whether the length difference between special-cable cores",
+    ),
+    "prüft, ob die maximale bündellänge am splice eingehalten wird.": (
+        "Kontrola ověřuje, zda je dodržena maximální délka svazku na spoji.",
+        "Checks whether the maximum bundle length at the splice is respected.",
+    ),
+    "prüft, ob die 3d-ausrichtung (gedichteter) stecker den grenzwert überschreitet.": (
+        "Kontrola ověřuje, zda 3D orientace (utěsněných) konektorů překračuje mezní hodnotu.",
+        "Checks whether the 3D orientation of (sealed) connectors exceeds the limit value.",
+    ),
+    "überprüfung der": ("Kontrola", "Check of"),
+    "prüft, ob": ("Kontrola ověřuje, zda", "Checks whether"),
+}
+
+
+def translate_metadata_text(value: str, lang: str) -> str:
+    """Translate common German Name/Beschreibung sheet metadata into CZ/EN."""
+    text_value = clean_value(value)
+    if not text_value:
+        return text_value
+
+    translated = text_value
+    lowered = translated.lower()
+    for source, (cz_target, en_target) in METADATA_TEXT_REPLACEMENTS.items():
+        if source in lowered:
+            target = cz_target if lang == "cz" else en_target
+            start = lowered.index(source)
+            end = start + len(source)
+            translated = translated[:start] + target + translated[end:]
+            lowered = translated.lower()
+
     return translated
