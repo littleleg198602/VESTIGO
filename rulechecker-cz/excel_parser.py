@@ -162,14 +162,13 @@ def _build_record_from_row(
     affected_en = _compose_from_columns(row, defn.affected_columns, "en")
 
     if defn.handler == "rc1":
-        part_col = _first_available_key(row, ["Teilenummer der Leitung", "Teilenummer", "Part number"])
-        part_no = clean_value(row.get(part_col)) if part_col else ""
+        part_no = _first_non_empty_value(row, ["Teilenummer der Leitung", "Teilenummer", "Part number"])
         where_cz = f"Číslo dílu drátu = {part_no or '-'}"
         where_en = f"Wire part number = {part_no or '-'}"
     elif defn.handler == "rc106":
-        ist = clean_value(row.get(_first_available_key(row, ["IST-Farbe", "Farbe Ist"]) or ""))
-        soll = clean_value(row.get(_first_available_key(row, ["SOLL-Farbe", "Farbe Soll"]) or ""))
-        match = clean_value(row.get(_first_available_key(row, ["Farben-Übereinstimmung", "Farbübereinstimmung"]) or ""))
+        ist = _first_non_empty_value(row, ["IST-Farbe", "Farbe Ist"])
+        soll = _first_non_empty_value(row, ["SOLL-Farbe", "Farbe Soll"])
+        match = _first_non_empty_value(row, ["Farben-Übereinstimmung", "Farbübereinstimmung"])
         where_cz = f"Skutečná barva (IST) = {ist or '-'}; Požadovaná barva (SOLL) = {soll or '-'}; Shoda barev = {match or '-'}"
         where_en = f"Actual color (IST) = {ist or '-'}; Required color (SOLL) = {soll or '-'}; Color match = {match or '-'}"
     else:
@@ -201,8 +200,7 @@ def _build_record_from_row(
 def _compose_from_columns(row: pd.Series, columns: list[str], lang: str) -> str:
     chunks = []
     for col in columns:
-        actual_col = _first_available_key(row, [col])
-        value = clean_value(row.get(actual_col)) if actual_col else ""
+        value = _first_non_empty_value(row, [col])
         if not value:
             continue
         translated = translate_header(col, lang)
@@ -348,10 +346,7 @@ def _extract_wire_number(row: pd.Series) -> str:
 
 
 def _extract_identifier_value(row: pd.Series, candidates: list[str]) -> str:
-    key = _first_available_key(row, candidates)
-    if not key:
-        return ""
-    value = clean_value(row.get(key))
+    value = _first_non_empty_value(row, candidates)
     if not value or value == "-":
         return ""
     return value
@@ -380,9 +375,23 @@ def _normalize_wire_number(value: str) -> str:
     return compact or "-"
 
 def _first_available_key(row: pd.Series, candidates: list[str]) -> str | None:
-    normalized_map = {_normalize_header(str(c)): str(c) for c in row.index}
     for candidate in candidates:
-        key = normalized_map.get(_normalize_header(candidate))
-        if key:
-            return key
+        normalized_candidate = _normalize_header(candidate)
+        for key in row.index:
+            normalized_key = _normalize_header(str(key))
+            if normalized_key == normalized_candidate or normalized_key.startswith(f"{normalized_candidate}__"):
+                return str(key)
     return None
+
+
+def _first_non_empty_value(row: pd.Series, candidates: list[str]) -> str:
+    for candidate in candidates:
+        normalized_candidate = _normalize_header(candidate)
+        for key in row.index:
+            normalized_key = _normalize_header(str(key))
+            if normalized_key != normalized_candidate and not normalized_key.startswith(f"{normalized_candidate}__"):
+                continue
+            value = clean_value(row.get(key))
+            if value and value != "-":
+                return value
+    return ""

@@ -54,6 +54,10 @@ MESSAGE_VALUE_REPLACEMENTS = {
         "Propojené příslušenství",
         "Linked accessories",
     ),
+    "bündellänge am splice darf nicht länger als 100 mm sein": (
+        "Délka svazku na spoji nesmí být delší než 100 mm",
+        "Bundle length at splice must not exceed 100 mm",
+    ),
 }
 
 
