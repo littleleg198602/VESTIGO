@@ -10,7 +10,7 @@ import pandas as pd
 from config import HEADER_STATUS_NAME
 from rc_maps import RCDefinition, get_rc_definition
 from severity import map_status_to_severity
-from translators import clean_value, translate_header, translate_value
+from translators import clean_value, translate_header, translate_metadata_text, translate_value
 from utils import extract_rc_number
 
 LOG = logging.getLogger(__name__)
@@ -277,14 +277,17 @@ def _extract_metadata_value(values: list[str]) -> str:
 
 
 def _with_sheet_metadata(defn: RCDefinition, name: str, description: str) -> RCDefinition:
-    title = name or defn.title_cz
-    explanation = description or defn.explanation_cz
+    if not name and not description:
+        return defn
+
+    title_base = name or defn.title_cz
+    explanation_base = description or defn.explanation_cz
     return replace(
         defn,
-        title_cz=title,
-        title_en=title,
-        explanation_cz=explanation,
-        explanation_en=description or defn.explanation_en,
+        title_cz=translate_metadata_text(title_base, "cz"),
+        title_en=translate_metadata_text(title_base, "en"),
+        explanation_cz=translate_metadata_text(explanation_base, "cz"),
+        explanation_en=translate_metadata_text(explanation_base, "en"),
     )
 
 

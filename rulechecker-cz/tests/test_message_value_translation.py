@@ -1,6 +1,6 @@
 import unittest
 
-from translators import translate_value
+from translators import translate_metadata_text, translate_value
 
 
 class TestMessageValueTranslation(unittest.TestCase):
@@ -40,6 +40,26 @@ class TestMessageValueTranslation(unittest.TestCase):
         self.assertIn("Účastníci LIN sběrnice jsou připojeni na různé zemnící body.", cz)
         self.assertIn("Connector has no ground wire.", en)
         self.assertIn("LIN bus participants are connected to different ground points.", en)
+
+
+    def test_translates_sheet_metadata_text(self):
+        name = "Splice: Überprüfung der Bündellänge am Splice"
+        desc = "Prüft, ob die maximale Bündellänge am Splice eingehalten wird."
+
+        self.assertIn("kontrola", translate_metadata_text(name, "cz").lower())
+        self.assertIn("check", translate_metadata_text(name, "en").lower())
+        self.assertIn("maximální délka svazku", translate_metadata_text(desc, "cz").lower())
+        self.assertIn("maximum bundle length", translate_metadata_text(desc, "en").lower())
+
+
+    def test_translates_sheet_metadata_ascii_variants(self):
+        name = "Leitung: Ueberpruefung der Laengendifferenz zwischen den Sonderleitungscores"
+        desc = "Prueft, ob die maximale Buendellaenge am Splice eingehalten wird."
+
+        self.assertIn("kontrola rozdílu délky", translate_metadata_text(name, "cz").lower())
+        self.assertIn("length difference", translate_metadata_text(name, "en").lower())
+        self.assertIn("maximální délka svazku", translate_metadata_text(desc, "cz").lower())
+        self.assertIn("maximum bundle length", translate_metadata_text(desc, "en").lower())
 
 if __name__ == "__main__":
     unittest.main()
