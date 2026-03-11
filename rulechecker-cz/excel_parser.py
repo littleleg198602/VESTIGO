@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable
 
@@ -56,7 +56,13 @@ def parse_workbook(path: Path) -> list[IssueRecord]:
         if rc is None:
             continue
 
-        df = _safe_read_rc_sheet(xls, sheet)
+        raw = _read_sheet_raw(xls, sheet)
+        if raw is None:
+            continue
+
+        sheet_name_value, sheet_description = _extract_sheet_metadata(raw)
+
+        df = _dataframe_from_raw_sheet(raw)
         if df is None:
             continue
 
@@ -65,7 +71,7 @@ def parse_workbook(path: Path) -> list[IssueRecord]:
             LOG.warning("List %s nemá rozpoznatelný sloupec stavu.", sheet)
             continue
 
-        defn = get_rc_definition(rc)
+        defn = _with_sheet_metadata(get_rc_definition(rc), sheet_name_value, sheet_description)
         records.extend(parse_rc_sheet(df, rc, defn, status_col))
 
     return records
@@ -209,14 +215,16 @@ def _compose_from_columns(row: pd.Series, columns: list[str], lang: str) -> str:
     return "; ".join(chunks) if chunks else "N/A"
 
 
-def _safe_read_rc_sheet(xls: pd.ExcelFile, sheet_name: str) -> pd.DataFrame | None:
+def _read_sheet_raw(xls: pd.ExcelFile, sheet_name: str) -> pd.DataFrame | None:
     try:
-        # 1) raw načtení bez headeru pro detekci hlavičky v různých řádcích
-        raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+        # raw načtení bez headeru pro detekci hlavičky i metadata v různých řádcích
+        return pd.read_excel(xls, sheet_name=sheet_name, header=None)
     except Exception as exc:
         LOG.warning("Nelze načíst list %s: %s", sheet_name, exc)
         return None
 
+
+def _dataframe_from_raw_sheet(raw: pd.DataFrame) -> pd.DataFrame | None:
     header_idx = _detect_header_row(raw)
     if header_idx is None:
         return None
@@ -226,6 +234,58 @@ def _safe_read_rc_sheet(xls: pd.ExcelFile, sheet_name: str) -> pd.DataFrame | No
     data.columns = _make_unique_headers(header_values)
     data = data.dropna(how="all")
     return data.reset_index(drop=True)
+
+
+def _safe_read_rc_sheet(xls: pd.ExcelFile, sheet_name: str) -> pd.DataFrame | None:
+    raw = _read_sheet_raw(xls, sheet_name)
+    if raw is None:
+        return None
+    return _dataframe_from_raw_sheet(raw)
+
+
+def _extract_sheet_metadata(raw: pd.DataFrame) -> tuple[str, str]:
+    name = ""
+    description = ""
+
+    max_rows = min(len(raw), 80)
+    for idx in range(max_rows):
+        row_values = [clean_value(v) for v in raw.iloc[idx].tolist() if clean_value(v)]
+        if not row_values:
+            continue
+
+        row_text = " ".join(row_values)
+        row_text_norm = _normalize_header(row_text)
+
+        if row_text_norm.startswith("name:") and not name:
+            name = _extract_metadata_value(row_values)
+        elif row_text_norm.startswith("beschreibung:") and not description:
+            description = _extract_metadata_value(row_values)
+
+        if name and description:
+            break
+
+    return name, description
+
+
+def _extract_metadata_value(values: list[str]) -> str:
+    if not values:
+        return ""
+    joined = " ".join(values).strip()
+    if ":" not in joined:
+        return joined
+    return joined.split(":", 1)[1].strip()
+
+
+def _with_sheet_metadata(defn: RCDefinition, name: str, description: str) -> RCDefinition:
+    title = name or defn.title_cz
+    explanation = description or defn.explanation_cz
+    return replace(
+        defn,
+        title_cz=title,
+        title_en=title,
+        explanation_cz=explanation,
+        explanation_en=description or defn.explanation_en,
+    )
 
 
 def _detect_header_row(raw: pd.DataFrame) -> int | None:
