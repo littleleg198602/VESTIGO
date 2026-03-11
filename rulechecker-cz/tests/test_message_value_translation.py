@@ -51,5 +51,15 @@ class TestMessageValueTranslation(unittest.TestCase):
         self.assertIn("maximální délka svazku", translate_metadata_text(desc, "cz").lower())
         self.assertIn("maximum bundle length", translate_metadata_text(desc, "en").lower())
 
+
+    def test_translates_sheet_metadata_ascii_variants(self):
+        name = "Leitung: Ueberpruefung der Laengendifferenz zwischen den Sonderleitungscores"
+        desc = "Prueft, ob die maximale Buendellaenge am Splice eingehalten wird."
+
+        self.assertIn("kontrola rozdílu délky", translate_metadata_text(name, "cz").lower())
+        self.assertIn("length difference", translate_metadata_text(name, "en").lower())
+        self.assertIn("maximální délka svazku", translate_metadata_text(desc, "cz").lower())
+        self.assertIn("maximum bundle length", translate_metadata_text(desc, "en").lower())
+
 if __name__ == "__main__":
     unittest.main()
