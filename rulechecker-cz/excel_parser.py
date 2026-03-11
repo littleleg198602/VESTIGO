@@ -301,6 +301,16 @@ def _extract_wire_number(row: pd.Series) -> str:
         "Leitung",
         "Leitungen",
         "Wire number",
+        "Endpunkt",
+        "Startpunkt",
+        "Signalname",
+        "Signal",
+        "Komponente",
+        "Sicherungsname",
+        "Sonderleitung",
+        "Splice",
+        "VOBES-ID",
+        "Potential",
     ]
 
     normalized_values: list[str] = []

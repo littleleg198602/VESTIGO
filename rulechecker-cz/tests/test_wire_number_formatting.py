@@ -64,6 +64,20 @@ class TestWireNumberFormatting(unittest.TestCase):
 
         self.assertEqual(records[0].wire_number, "43165\n43166")
 
+    def test_uses_connector_endpoint_when_wire_number_missing(self):
+        df = pd.DataFrame([
+            {
+                "Einschätzung": "Fehler",
+                "Leitungsnummer": "-",
+                "Endpunkt": "X1/12",
+                "Startpunkt": "T1/1",
+            }
+        ])
+
+        records = parse_rc_sheet(df, 115, get_rc_definition(115))
+
+        self.assertEqual(records[0].wire_number, "X1\n12")
+
 
 if __name__ == "__main__":
     unittest.main()
