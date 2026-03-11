@@ -35,6 +35,22 @@ class TestRC121Grouping(unittest.TestCase):
         self.assertIn("Dotčené dráty = 23001, 23002", out[0].where_cz)
         self.assertIn("Affected wires = 23001, 23002", out[0].where_en)
 
+    def test_falls_back_to_splice_identifier_when_wires_missing(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "Einschätzung": "Nicht in Ordnung",
+                    "Splice": "SP_TEST",
+                    "VOBES-ID": "V01",
+                    "Farbe Ist": "sw",
+                    "Farbe Soll": "sw",
+                }
+            ]
+        )
+        out = parse_rc_sheet(df, 121, get_rc_definition(121))
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0].wire_number, "SP_TEST")
+
 
 if __name__ == "__main__":
     unittest.main()

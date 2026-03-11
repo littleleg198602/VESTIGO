@@ -21,7 +21,7 @@ class TestObjectTypeAndWireColumn(unittest.TestCase):
         self.assertEqual(records[0].object_type_cz, "Drát")
 
         frames = build_output_frames(records)
-        self.assertIn("Číslo drátu", frames["Prehled_CZ"].columns)
+        self.assertIn("Identifikátor", frames["Prehled_CZ"].columns)
         self.assertIn("Object type", frames["Overview_EN"].columns)
 
 
