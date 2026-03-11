@@ -76,7 +76,7 @@ class TestWireNumberFormatting(unittest.TestCase):
 
         records = parse_rc_sheet(df, 115, get_rc_definition(115))
 
-        self.assertEqual(records[0].wire_number, "X1\n12")
+        self.assertEqual(records[0].wire_number, "T1/1 -> X1/12")
 
     def test_uses_stecker_name_when_wire_number_missing(self):
         df = pd.DataFrame([
@@ -89,6 +89,19 @@ class TestWireNumberFormatting(unittest.TestCase):
         records = parse_rc_sheet(df, 115, get_rc_definition(115))
 
         self.assertEqual(records[0].wire_number, "XA.GX1.1_XA.GX1.2")
+
+    def test_uses_sicherung_name_for_fuse_rows(self):
+        df = pd.DataFrame([
+            {
+                "Einschätzung": "Nicht in Ordnung",
+                "Sicherungsname": "SI_LVIR_F16",
+                "Sicherungstyp": "Type_C",
+            }
+        ])
+
+        records = parse_rc_sheet(df, 610, get_rc_definition(610))
+
+        self.assertEqual(records[0].wire_number, "SI_LVIR_F16")
 
 
 if __name__ == "__main__":

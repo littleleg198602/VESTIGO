@@ -297,28 +297,19 @@ def _unique_values(df: pd.DataFrame, candidates: list[str]) -> list[str]:
 
 
 def _extract_wire_number(row: pd.Series) -> str:
-    candidate_columns = [
+    start_point = _extract_identifier_value(row, ["Startpunkt"]) 
+    end_point = _extract_identifier_value(row, ["Endpunkt"])
+    if start_point and end_point:
+        return f"{start_point} -> {end_point}"
+
+    normalized_columns = [
         "Leitungsnummer",
         "Leitung",
         "Leitungen",
         "Wire number",
-        "Stecker",
-        "Steckername",
-        "Connector",
-        "Endpunkt",
-        "Startpunkt",
-        "Signalname",
-        "Signal",
-        "Komponente",
-        "Sicherungsname",
-        "Sonderleitung",
-        "Splice",
-        "VOBES-ID",
-        "Potential",
     ]
-
     normalized_values: list[str] = []
-    for candidate in candidate_columns:
+    for candidate in normalized_columns:
         key = _first_available_key(row, [candidate])
         if not key:
             continue
@@ -326,13 +317,44 @@ def _extract_wire_number(row: pd.Series) -> str:
         if value and value != "-":
             normalized_values.append(value)
 
-    if not normalized_values:
-        return "-"
+    if normalized_values:
+        for value in normalized_values:
+            if "\n" in value:
+                return value
+        return normalized_values[0]
 
-    for value in normalized_values:
-        if "\n" in value:
+    preserve_columns = [
+        "Stecker",
+        "Steckername",
+        "Connector",
+        "Sicherungsname",
+        "Sicherungsträger",
+        "Sicherungsplatz",
+        "Sicherungstyp",
+        "Signalname",
+        "Signal",
+        "Komponente",
+        "Sonderleitung",
+        "Splice",
+        "VOBES-ID",
+        "Potential",
+    ]
+    for column in preserve_columns:
+        value = _extract_identifier_value(row, [column])
+        if value:
             return value
-    return normalized_values[0]
+
+    return "-"
+
+
+def _extract_identifier_value(row: pd.Series, candidates: list[str]) -> str:
+    key = _first_available_key(row, candidates)
+    if not key:
+        return ""
+    value = clean_value(row.get(key))
+    if not value or value == "-":
+        return ""
+    return value
 
 
 def _normalize_wire_number(value: str) -> str:
