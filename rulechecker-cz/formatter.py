@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.worksheet.datavalidation import DataValidation
 
 from config import (
     OUTPUT_SHEET_CZ,
@@ -126,6 +127,47 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
             ws = writer.book[sheet]
             _add_rc_hyperlinks(ws, records_by_sheet.get(sheet, []))
             _format_sheet(ws, sheet)
+            _add_progress_validation(ws)
+
+
+def _split_records_by_sheet(records: list[IssueRecord]) -> dict[str, list[IssueRecord]]:
+    return {
+        OUTPUT_SHEET_CZ: records,
+        OUTPUT_SHEET_EN: records,
+    }
+
+
+def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
+    rc_col_idx = None
+    for idx, cell in enumerate(ws[1], start=1):
+        if cell.value == "RC":
+            rc_col_idx = idx
+            break
+
+    if rc_col_idx is None:
+        return
+
+    for row_idx, record in enumerate(sheet_records, start=2):
+        if row_idx > ws.max_row:
+            break
+        cell = ws.cell(row=row_idx, column=rc_col_idx)
+        cell.hyperlink = f"{record.source_file}#'{record.source_sheet}'!A{record.source_row}"
+        cell.style = "Hyperlink"
+
+
+def _add_progress_validation(ws) -> None:
+    progress_col_idx = None
+    for idx, cell in enumerate(ws[1], start=1):
+        if cell.value == "Progress":
+            progress_col_idx = idx
+            break
+    if progress_col_idx is None or ws.max_row < 2:
+        return
+
+    progress_col_letter = ws.cell(row=1, column=progress_col_idx).column_letter
+    validation = DataValidation(type="list", formula1='"done,in progress,N/A,false"', allow_blank=True)
+    ws.add_data_validation(validation)
+    validation.add(f"{progress_col_letter}2:{progress_col_letter}{ws.max_row}")
 
 
 def _split_records_by_sheet(records: list[IssueRecord]) -> dict[str, list[IssueRecord]]:

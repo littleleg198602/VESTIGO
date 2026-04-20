@@ -46,6 +46,8 @@ class TestFormatterWireWrap(unittest.TestCase):
                 ws["A2"].fill.fgColor.value,
                 {"00FDE2E4", "00F8C8CD", "00F5B5BC", "00F29CA7"},
             )
+            validations = list(ws.data_validations.dataValidation)
+            self.assertTrue(any(v.formula1 == '"done,in progress,N/A,false"' for v in validations))
 
 
 if __name__ == "__main__":
