@@ -42,6 +42,15 @@ pip install -r requirements.txt
 python main.py
 ```
 
+### Spouštěč bez příkazové řádky (Windows)
+
+V adresáři projektu je připraven soubor `Spustit_RuleChecker.bat`.
+Stačí na něj dvojkliknout a nástroj se spustí automaticky.
+
+- Pokud existuje `.venv\Scripts\python.exe`, použije se virtuální prostředí.
+- Jinak se použije `python` z PATH.
+- Po doběhnutí se okno ponechá otevřené (`pause`), aby bylo vidět, zda vše proběhlo v pořádku.
+
 Volitelně vlastní cesty:
 
 ```bash
