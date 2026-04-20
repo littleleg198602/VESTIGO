@@ -158,13 +158,45 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
 
 def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
     frames = build_output_frames(records)
+    records_by_sheet = _split_records_by_sheet(records)
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         for sheet, df in frames.items():
             df.to_excel(writer, sheet_name=sheet, index=False)
 
         for sheet in frames:
             ws = writer.book[sheet]
+            _add_rc_hyperlinks(ws, records_by_sheet.get(sheet, []))
             _format_sheet(ws, sheet)
+
+
+def _split_records_by_sheet(records: list[IssueRecord]) -> dict[str, list[IssueRecord]]:
+    return {
+        OUTPUT_SHEET_CZ: records,
+        OUTPUT_SHEET_EN: records,
+        CRITICAL_SHEET_CZ: [r for r in records if r.severity_cz == "Kritické"],
+        CRITICAL_SHEET_EN: [r for r in records if r.severity_en == "Critical"],
+        NON_CRITICAL_SHEET_CZ: [r for r in records if r.severity_cz == "Nekritické"],
+        NON_CRITICAL_SHEET_EN: [r for r in records if r.severity_en == "Non-critical"],
+        LEGACY_INSPIRED_SHEET_EN: records,
+    }
+
+
+def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
+    rc_col_idx = None
+    for idx, cell in enumerate(ws[1], start=1):
+        if cell.value == "RC":
+            rc_col_idx = idx
+            break
+
+    if rc_col_idx is None:
+        return
+
+    for row_idx, record in enumerate(sheet_records, start=2):
+        if row_idx > ws.max_row:
+            break
+        cell = ws.cell(row=row_idx, column=rc_col_idx)
+        cell.hyperlink = f"{record.source_file}#'{record.source_sheet}'!A{record.source_row}"
+        cell.style = "Hyperlink"
 
 
 def _format_sheet(ws, sheet_name: str) -> None:
