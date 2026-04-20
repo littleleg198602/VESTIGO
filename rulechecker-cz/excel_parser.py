@@ -8,10 +8,10 @@ from typing import Iterable
 import pandas as pd
 
 from config import HEADER_STATUS_NAME
-from rc_maps import RCDefinition, get_rc_definition
+from rc_maps import RC_DEFINITIONS, RCDefinition, get_rc_definition
 from severity import map_status_to_severity
 from translators import clean_value, translate_header, translate_metadata_text, translate_value
-from utils import extract_rc_number
+from utils import extract_harness_name, extract_rc_number
 
 LOG = logging.getLogger(__name__)
 
@@ -41,6 +41,10 @@ class IssueRecord:
     where_en: str
     recommendation_cz: str
     recommendation_en: str
+    harness_name: str = ""
+    source_file: str = ""
+    source_sheet: str = ""
+    source_row: int = 1
 
 
 def parse_workbook(path: Path) -> list[IssueRecord]:
@@ -51,6 +55,7 @@ def parse_workbook(path: Path) -> list[IssueRecord]:
         return []
 
     records: list[IssueRecord] = []
+    harness_name = extract_harness_name(path.stem)
     for sheet in xls.sheet_names:
         rc = extract_rc_number(sheet)
         if rc is None:
@@ -72,30 +77,69 @@ def parse_workbook(path: Path) -> list[IssueRecord]:
             continue
 
         defn = _with_sheet_metadata(get_rc_definition(rc), sheet_name_value, sheet_description)
-        records.extend(parse_rc_sheet(df, rc, defn, status_col))
+        records.extend(
+            parse_rc_sheet(
+                df,
+                rc,
+                defn,
+                status_col,
+                source_file=path.name,
+                source_sheet=sheet,
+                harness_name=harness_name,
+            )
+        )
 
     return records
 
 
-def parse_rc_sheet(df: pd.DataFrame, rc: int, defn: RCDefinition, status_col: str = HEADER_STATUS_NAME) -> list[IssueRecord]:
+def parse_rc_sheet(
+    df: pd.DataFrame,
+    rc: int,
+    defn: RCDefinition,
+    status_col: str = HEADER_STATUS_NAME,
+    source_file: str = "",
+    source_sheet: str = "",
+    harness_name: str = "",
+) -> list[IssueRecord]:
     severity_series = df[status_col].map(lambda value: map_status_to_severity(clean_value(value)))
     filtered = df[severity_series.notna()].copy()
     if filtered.empty:
         return []
 
     if defn.handler == "rc121":
-        return _parse_rc121_grouped(filtered, rc, defn, status_col)
+        return _parse_rc121_grouped(filtered, rc, defn, status_col, source_file, source_sheet, harness_name)
 
     out: list[IssueRecord] = []
     for idx, row in filtered.iterrows():
         severity = severity_series.loc[idx]
         if not severity:
             continue
-        out.append(_build_record_from_row(row, rc, defn, severity.cz, severity.en))
+        source_row = _resolve_source_row(df, idx)
+        out.append(
+            _build_record_from_row(
+                row,
+                rc,
+                defn,
+                severity.cz,
+                severity.en,
+                source_file,
+                source_sheet,
+                source_row,
+                harness_name,
+            )
+        )
     return out
 
 
-def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition, status_col: str) -> list[IssueRecord]:
+def _parse_rc121_grouped(
+    df: pd.DataFrame,
+    rc: int,
+    defn: RCDefinition,
+    status_col: str,
+    source_file: str,
+    source_sheet: str,
+    harness_name: str,
+) -> list[IssueRecord]:
     key_splice = _find_col(df.columns, ["Splice", "Spleiß", "Splice-Name"])
     key_vobes = _find_col(df.columns, ["VOBES-ID", "VOBES"])
     if not key_splice:
@@ -108,6 +152,7 @@ def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition, status_c
     groups = df.groupby([key_splice, key_vobes], dropna=False)
     out: list[IssueRecord] = []
     for _, group in groups:
+        first_group_idx = group.index[0]
         status = clean_value(group.iloc[0].get(status_col))
         severity = map_status_to_severity(status)
         if not severity:
@@ -137,6 +182,7 @@ def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition, status_c
         out.append(
             IssueRecord(
                 rc=rc,
+                harness_name=harness_name,
                 severity_cz=severity.cz,
                 severity_en=severity.en,
                 title_cz=defn.title_cz,
@@ -152,6 +198,9 @@ def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition, status_c
                 where_en=where_en,
                 recommendation_cz=defn.recommendation_cz,
                 recommendation_en=defn.recommendation_en,
+                source_file=source_file,
+                source_sheet=source_sheet,
+                source_row=_resolve_source_row(df, first_group_idx),
             )
         )
     return out
@@ -163,6 +212,10 @@ def _build_record_from_row(
     defn: RCDefinition,
     severity_cz: str,
     severity_en: str,
+    source_file: str,
+    source_sheet: str,
+    source_row: int,
+    harness_name: str,
 ) -> IssueRecord:
     affected_cz = _compose_from_columns(row, defn.affected_columns, "cz")
     affected_en = _compose_from_columns(row, defn.affected_columns, "en")
@@ -185,6 +238,7 @@ def _build_record_from_row(
 
     return IssueRecord(
         rc=rc,
+        harness_name=harness_name,
         severity_cz=severity_cz,
         severity_en=severity_en,
         title_cz=defn.title_cz,
@@ -200,6 +254,9 @@ def _build_record_from_row(
         where_en=where_en,
         recommendation_cz=defn.recommendation_cz,
         recommendation_en=defn.recommendation_en,
+        source_file=source_file,
+        source_sheet=source_sheet,
+        source_row=source_row,
     )
 
 
@@ -233,7 +290,19 @@ def _dataframe_from_raw_sheet(raw: pd.DataFrame) -> pd.DataFrame | None:
     data = raw.iloc[header_idx + 1 :].copy()
     data.columns = _make_unique_headers(header_values)
     data = data.dropna(how="all")
-    return data.reset_index(drop=True)
+    source_rows = list(data.index + 1)
+    out = data.reset_index(drop=True)
+    out.attrs["source_rows"] = source_rows
+    return out
+
+
+def _resolve_source_row(df: pd.DataFrame, idx: int) -> int:
+    source_rows = df.attrs.get("source_rows")
+    if not isinstance(source_rows, list):
+        return int(idx) + 2
+    if idx < 0 or idx >= len(source_rows):
+        return int(idx) + 2
+    return int(source_rows[idx])
 
 
 def _safe_read_rc_sheet(xls: pd.ExcelFile, sheet_name: str) -> pd.DataFrame | None:
@@ -277,11 +346,22 @@ def _extract_metadata_value(values: list[str]) -> str:
 
 
 def _with_sheet_metadata(defn: RCDefinition, name: str, description: str) -> RCDefinition:
+    if defn.rc in RC_DEFINITIONS:
+        return defn
+
     if not name and not description:
         return defn
 
     title_base = name or defn.title_cz
     explanation_base = description or defn.explanation_cz
+    if defn.handler == "rc1":
+        return replace(
+            defn,
+            title_cz=translate_metadata_text(title_base, "cz"),
+            title_en=translate_metadata_text(title_base, "en"),
+            explanation_cz=defn.explanation_cz,
+            explanation_en=defn.explanation_en,
+        )
     return replace(
         defn,
         title_cz=translate_metadata_text(title_base, "cz"),

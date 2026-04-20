@@ -4,65 +4,43 @@ from pathlib import Path
 
 import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.worksheet.datavalidation import DataValidation
 
 from config import (
-    CRITICAL_SHEET_CZ,
-    CRITICAL_SHEET_EN,
-    NON_CRITICAL_SHEET_CZ,
-    NON_CRITICAL_SHEET_EN,
-    LEGACY_INSPIRED_SHEET_EN,
     OUTPUT_SHEET_CZ,
     OUTPUT_SHEET_EN,
 )
 from excel_parser import IssueRecord
 
 CZ_COLUMNS = [
+    "Název svazku",
     "Závažnost",
     "RC",
     "Typ objektu",
     "Identifikátor",
     "Název chyby",
     "Vysvětlení",
-    "Čeho se týká",
-    "Kde je chyba",
     "Doporučení",
     "Priority",
     "Progress",
     "Solution",
 ]
 EN_COLUMNS = [
+    "Harness name",
     "Severity",
     "RC",
     "Object type",
     "Identifier",
     "Error title",
     "Explanation",
-    "Affected object",
-    "Where is the issue",
     "Recommendation",
     "Priority",
     "Progress",
     "Solution",
 ]
 
-LEGACY_EN_COLUMNS = [
-    "Number of mistake",
-    "Type of part",
-    "Name of correction",
-    "Task",
-    "Area",
-    "Priority",
-    "Status",
-    "note",
-]
-
-
 def _legacy_priority(severity_en: str) -> str:
     return "Not OK" if severity_en == "Critical" else "Warning"
-
-
-def _legacy_status(severity_en: str) -> str:
-    return "in progress" if severity_en == "Critical" else "done"
 
 HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
@@ -94,15 +72,14 @@ def _pick_fill(severity: str, row_idx: int) -> PatternFill:
 def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
     cz_rows = [
         {
+            "Název svazku": r.harness_name,
             "Závažnost": r.severity_cz,
             "RC": r.rc,
             "Typ objektu": r.object_type_cz,
             "Identifikátor": r.wire_number,
             "Název chyby": r.title_cz,
             "Vysvětlení": r.explanation_cz,
-            "Čeho se týká": r.affected_cz,
-            "Kde je chyba": r.where_cz,
-            "Doporučení": r.recommendation_cz,
+            "Doporučení": _compose_recommendation(r.affected_cz, r.where_cz, r.recommendation_cz),
             "Priority": _legacy_priority(r.severity_en),
             "Progress": "",
             "Solution": "",
@@ -111,15 +88,14 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
     ]
     en_rows = [
         {
+            "Harness name": r.harness_name,
             "Severity": r.severity_en,
             "RC": r.rc,
             "Object type": r.object_type_en,
             "Identifier": r.wire_number,
             "Error title": r.title_en,
             "Explanation": r.explanation_en,
-            "Affected object": r.affected_en,
-            "Where is the issue": r.where_en,
-            "Recommendation": r.recommendation_en,
+            "Recommendation": _compose_recommendation(r.affected_en, r.where_en, r.recommendation_en),
             "Priority": _legacy_priority(r.severity_en),
             "Progress": "",
             "Solution": "",
@@ -130,41 +106,68 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
     cz_df = pd.DataFrame(cz_rows, columns=CZ_COLUMNS)
     en_df = pd.DataFrame(en_rows, columns=EN_COLUMNS)
 
-    legacy_rows = [
-        {
-            "Number of mistake": f"RC {r.rc}",
-            "Type of part": r.object_type_en,
-            "Name of correction": r.title_en,
-            "Task": r.explanation_en,
-            "Area": "Wiring",
-            "Priority": _legacy_priority(r.severity_en),
-            "Status": _legacy_status(r.severity_en),
-            "note": r.recommendation_en,
-        }
-        for r in records
-    ]
-    legacy_df = pd.DataFrame(legacy_rows, columns=LEGACY_EN_COLUMNS)
-
     return {
         OUTPUT_SHEET_CZ: cz_df,
         OUTPUT_SHEET_EN: en_df,
-        CRITICAL_SHEET_CZ: cz_df[cz_df["Závažnost"] == "Kritické"],
-        CRITICAL_SHEET_EN: en_df[en_df["Severity"] == "Critical"],
-        NON_CRITICAL_SHEET_CZ: cz_df[cz_df["Závažnost"] == "Nekritické"],
-        NON_CRITICAL_SHEET_EN: en_df[en_df["Severity"] == "Non-critical"],
-        LEGACY_INSPIRED_SHEET_EN: legacy_df,
     }
+
+
+def _compose_recommendation(affected: str, where: str, recommendation: str) -> str:
+    return f"{affected}; {where}; {recommendation}".strip("; ").strip()
 
 
 def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
     frames = build_output_frames(records)
+    records_by_sheet = _split_records_by_sheet(records)
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         for sheet, df in frames.items():
             df.to_excel(writer, sheet_name=sheet, index=False)
 
         for sheet in frames:
             ws = writer.book[sheet]
+            _add_rc_hyperlinks(ws, records_by_sheet.get(sheet, []))
             _format_sheet(ws, sheet)
+            _add_progress_validation(ws)
+
+
+def _split_records_by_sheet(records: list[IssueRecord]) -> dict[str, list[IssueRecord]]:
+    return {
+        OUTPUT_SHEET_CZ: records,
+        OUTPUT_SHEET_EN: records,
+    }
+
+
+def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
+    rc_col_idx = None
+    for idx, cell in enumerate(ws[1], start=1):
+        if cell.value == "RC":
+            rc_col_idx = idx
+            break
+
+    if rc_col_idx is None:
+        return
+
+    for row_idx, record in enumerate(sheet_records, start=2):
+        if row_idx > ws.max_row:
+            break
+        cell = ws.cell(row=row_idx, column=rc_col_idx)
+        cell.hyperlink = f"{record.source_file}#'{record.source_sheet}'!A{record.source_row}"
+        cell.style = "Hyperlink"
+
+
+def _add_progress_validation(ws) -> None:
+    progress_col_idx = None
+    for idx, cell in enumerate(ws[1], start=1):
+        if cell.value == "Progress":
+            progress_col_idx = idx
+            break
+    if progress_col_idx is None or ws.max_row < 2:
+        return
+
+    progress_col_letter = ws.cell(row=1, column=progress_col_idx).column_letter
+    validation = DataValidation(type="list", formula1='"done,in progress,N/A,false"', allow_blank=True)
+    ws.add_data_validation(validation)
+    validation.add(f"{progress_col_letter}2:{progress_col_letter}{ws.max_row}")
 
 
 def _format_sheet(ws, sheet_name: str) -> None:
@@ -180,35 +183,29 @@ def _format_sheet(ws, sheet_name: str) -> None:
         max_len = max(len(str(c.value or "")) for c in col)
         ws.column_dimensions[col[0].column_letter].width = min(max(max_len + 2, 14), 60)
 
-    where_col_name = "Kde je chyba" if "CZ" in sheet_name else "Where is the issue"
     wire_col_name = "Identifikátor" if "CZ" in sheet_name else "Identifier"
-    where_col_idx = None
+    severity_col_name = "Závažnost" if "CZ" in sheet_name else "Severity"
     wire_col_idx = None
+    severity_col_idx = None
     for idx, cell in enumerate(ws[1], start=1):
-        if cell.value == where_col_name:
-            where_col_idx = idx
         if cell.value == wire_col_name:
             wire_col_idx = idx
+        if cell.value == severity_col_name:
+            severity_col_idx = idx
 
     critical_row_idx = 0
     non_critical_row_idx = 0
     for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-        lead_value = str(row[0].value or "")
-        if sheet_name == LEGACY_INSPIRED_SHEET_EN:
-            priority = str(row[5].value or "")
-            if priority == "Not OK":
-                fill = _pick_fill(priority, critical_row_idx)
-                critical_row_idx += 1
-            else:
-                fill = _pick_fill(priority, non_critical_row_idx)
-                non_critical_row_idx += 1
+        severity_value = ""
+        if severity_col_idx:
+            severity_value = str(row[severity_col_idx - 1].value or "")
+        lead_value = severity_value
+        if lead_value in {"Kritické", "Critical"}:
+            fill = _pick_fill(lead_value, critical_row_idx)
+            critical_row_idx += 1
         else:
-            if lead_value in {"Kritické", "Critical"}:
-                fill = _pick_fill(lead_value, critical_row_idx)
-                critical_row_idx += 1
-            else:
-                fill = _pick_fill(lead_value, non_critical_row_idx)
-                non_critical_row_idx += 1
+            fill = _pick_fill(lead_value, non_critical_row_idx)
+            non_critical_row_idx += 1
 
         max_lines = 1
         for cell in row:
@@ -219,8 +216,6 @@ def _format_sheet(ws, sheet_name: str) -> None:
             if line_count > max_lines:
                 max_lines = line_count
 
-        if where_col_idx:
-            row[where_col_idx - 1].alignment = Alignment(wrap_text=True, vertical="top")
         if wire_col_idx:
             row[wire_col_idx - 1].alignment = Alignment(wrap_text=True, vertical="top")
 

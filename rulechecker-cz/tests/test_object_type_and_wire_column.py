@@ -60,7 +60,7 @@ class TestObjectTypeAndWireColumn(unittest.TestCase):
         self.assertEqual(defn.object_type_cz, "Konektor")
         self.assertEqual(defn.object_type_en, "Connector")
         self.assertIn("Verwendungsstelle", defn.affected_columns)
-        self.assertIn("mateřském seznamu", defn.explanation_cz)
+        self.assertIn("seznamu rodičů", defn.explanation_cz)
 
 if __name__ == "__main__":
     unittest.main()
