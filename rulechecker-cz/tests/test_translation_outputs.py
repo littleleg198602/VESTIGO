@@ -30,17 +30,27 @@ class TestTranslationOutputs(unittest.TestCase):
         en = frames["Overview_EN"]
 
         self.assertEqual(cz.iloc[0]["Identifikátor"], "385")
+        self.assertEqual(cz.iloc[0]["Název svazku"], "")
         self.assertEqual(cz.iloc[0]["Název chyby"], "Shoda barvy drátu a signálu")
+        self.assertEqual(en.iloc[0]["Harness name"], "")
         self.assertEqual(en.iloc[0]["Object type"], "Wire")
         self.assertEqual(en.iloc[0]["Error title"], "Wire and signal color consistency")
+        self.assertEqual(
+            cz.iloc[0]["Doporučení"],
+            "Leitung 385; Skutečná barva (IST) = br/sw; CZ doporučení",
+        )
+        self.assertEqual(
+            en.iloc[0]["Recommendation"],
+            "Leitung 385; Actual color (IST) = br/sw; EN recommendation",
+        )
         self.assertEqual(cz.iloc[0]["Priority"], "Not OK")
-        self.assertEqual(cz.iloc[0]["Progress"], "")
+        self.assertEqual(cz.iloc[0]["Progress"], "in progress")
         self.assertEqual(cz.iloc[0]["Solution"], "")
         self.assertEqual(en.iloc[0]["Priority"], "Not OK")
-        self.assertEqual(en.iloc[0]["Progress"], "")
+        self.assertEqual(en.iloc[0]["Progress"], "in progress")
         self.assertEqual(en.iloc[0]["Solution"], "")
 
-    def test_legacy_inspired_frame_columns_and_values(self):
+    def test_output_contains_only_cz_en_overview_sheets(self):
         record = IssueRecord(
             rc=1,
             severity_cz="Nekritické",
@@ -61,21 +71,7 @@ class TestTranslationOutputs(unittest.TestCase):
         )
 
         frames = build_output_frames([record])
-        legacy = frames["LegacyInspired_EN"]
-
-        self.assertEqual(legacy.columns.tolist(), [
-            "Number of mistake",
-            "Type of part",
-            "Name of correction",
-            "Task",
-            "Area",
-            "Priority",
-            "Status",
-            "note",
-        ])
-        self.assertEqual(legacy.iloc[0]["Number of mistake"], "RC 1")
-        self.assertEqual(legacy.iloc[0]["Priority"], "Warning")
-        self.assertEqual(legacy.iloc[0]["Status"], "done")
+        self.assertEqual(set(frames.keys()), {"Prehled_CZ", "Overview_EN"})
 
 
 if __name__ == "__main__":
