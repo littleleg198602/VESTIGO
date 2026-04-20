@@ -170,6 +170,31 @@ def _add_progress_validation(ws) -> None:
     validation.add(f"{progress_col_letter}2:{progress_col_letter}{ws.max_row}")
 
 
+def _split_records_by_sheet(records: list[IssueRecord]) -> dict[str, list[IssueRecord]]:
+    return {
+        OUTPUT_SHEET_CZ: records,
+        OUTPUT_SHEET_EN: records,
+    }
+
+
+def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
+    rc_col_idx = None
+    for idx, cell in enumerate(ws[1], start=1):
+        if cell.value == "RC":
+            rc_col_idx = idx
+            break
+
+    if rc_col_idx is None:
+        return
+
+    for row_idx, record in enumerate(sheet_records, start=2):
+        if row_idx > ws.max_row:
+            break
+        cell = ws.cell(row=row_idx, column=rc_col_idx)
+        cell.hyperlink = f"{record.source_file}#'{record.source_sheet}'!A{record.source_row}"
+        cell.style = "Hyperlink"
+
+
 def _format_sheet(ws, sheet_name: str) -> None:
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
