@@ -7,11 +7,19 @@ from pathlib import Path
 from config import OUTPUT_PATTERN_HINTS
 
 RC_SHEET_RE = re.compile(r"^(?P<rc>\d+)_")
+HARNESS_NAME_RE = re.compile(r"^PrfBer_(?P<harness>.+?)_\d{6}_")
 
 
 def extract_rc_number(sheet_name: str) -> int | None:
     match = RC_SHEET_RE.match(sheet_name.strip())
     return int(match.group("rc")) if match else None
+
+
+def extract_harness_name(file_stem: str) -> str:
+    match = HARNESS_NAME_RE.match(file_stem.strip())
+    if match:
+        return match.group("harness")
+    return file_stem
 
 
 def is_generated_output_file(path: Path) -> bool:

@@ -1,7 +1,7 @@
 # rulechecker-cz
 
 Python projekt pro zpracování Excel reportů z RuleChecker / Capital Harness Analyzer.
-Nástroj pro každý vstupní report vytvoří nový výstupní `.xlsx` s přehledem problémů ve dvou jazycích (čeština + angličtina), včetně rozdělení na kritické a nekritické položky.
+Nástroj pro každý vstupní report vytvoří nový výstupní `.xlsx` s přehledem problémů ve dvou jazycích (čeština + angličtina).
 
 ## Co projekt dělá
 
@@ -19,14 +19,9 @@ Nástroj pro každý vstupní report vytvoří nový výstupní `.xlsx` s přehl
 - Vytváří vždy 1 výstupní soubor pro 1 vstupní soubor ve formátu:
   - `<vstup>__prehled_CZ_EN__YYYYMMDD_HHMMSS.xlsx`
   - při kolizi názvu přidá `__01`, `__02`, ...
-- Výstup obsahuje listy:
+- Výstup obsahuje pouze 2 listy:
   - `Prehled_CZ`
   - `Overview_EN`
-  - `Kriticke_CZ`
-  - `Critical_EN`
-  - `Nekriticke_CZ`
-  - `NonCritical_EN`
-  - `LegacyInspired_EN` (anglický list inspirovaný dřívějším "Prehled chyb" formátem)
 
 ## Instalace
 
@@ -41,6 +36,15 @@ pip install -r requirements.txt
 ```bash
 python main.py
 ```
+
+### Spouštěč bez příkazové řádky (Windows)
+
+V adresáři projektu je připraven soubor `Spustit_RuleChecker.bat`.
+Stačí na něj dvojkliknout a nástroj se spustí automaticky.
+
+- Pokud existuje `.venv\Scripts\python.exe`, použije se virtuální prostředí.
+- Jinak se použije `python` z PATH.
+- Po doběhnutí se okno ponechá otevřené (`pause`), aby bylo vidět, zda vše proběhlo v pořádku.
 
 Volitelně vlastní cesty:
 
@@ -82,7 +86,12 @@ Mapování stavů je v `severity.py`:
 
 - České listy obsahují i samostatné sloupce `Typ objektu`, `Identifikátor`, `Priority`, `Progress`, `Solution`.
 - Anglické listy obsahují i samostatné sloupce `Object type`, `Identifier`, `Priority`, `Progress`, `Solution`.
+- Na začátku přehledu je nový sloupec se jménem svazku:
+  - CZ: `Název svazku`
+  - EN: `Harness name`
 - `Leitungsnummer` je mapováno do obecného sloupce `Identifikátor` (pro vyhledání čísla drátu, názvu konektoru nebo jiného klíče objektu).
+- Sloupce `Čeho se týká` a `Kde je chyba` se už samostatně negenerují.
+- Sloupec doporučení obsahuje sloučené informace (`Čeho se týká` + `Kde je chyba` + doporučení).
 
 - Parser vytváří interní datový model (`IssueRecord`) v `excel_parser.py`.
 - Teprve z interního modelu vznikají DataFrame pro:
@@ -90,11 +99,6 @@ Mapování stavů je v `severity.py`:
   - `Overview_EN` (anglicky)
 - Překlady hlaviček a textových labelů jsou centralizované v `translators.py`.
 - Listy jsou jazykově konzistentní (bez mixu čeština/angličtina/němčina).
-
-- Nový list `LegacyInspired_EN` přidává známé sloupce z historické šablony:
-  - `Number of mistake`, `Type of part`, `Name of correction`, `Task`, `Area`, `Priority`, `Status`, `note`
-  - `Priority` je mapované z vážnosti (`Critical -> Not OK`, `Non-critical -> Warning`)
-  - `Status` je orientačně předvyplněn (`Critical -> in progress`, `Non-critical -> done`)
 
 ## Formátování výstupu
 
