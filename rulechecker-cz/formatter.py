@@ -19,8 +19,6 @@ CZ_COLUMNS = [
     "Identifikátor",
     "Název chyby",
     "Vysvětlení",
-    "Čeho se týká",
-    "Kde je chyba",
     "Doporučení",
     "Priority",
     "Progress",
@@ -34,8 +32,6 @@ EN_COLUMNS = [
     "Identifier",
     "Error title",
     "Explanation",
-    "Affected object",
-    "Where is the issue",
     "Recommendation",
     "Priority",
     "Progress",
@@ -82,8 +78,6 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Identifikátor": r.wire_number,
             "Název chyby": r.title_cz,
             "Vysvětlení": r.explanation_cz,
-            "Čeho se týká": r.affected_cz,
-            "Kde je chyba": r.where_cz,
             "Doporučení": _compose_recommendation(r.affected_cz, r.where_cz, r.recommendation_cz),
             "Priority": _legacy_priority(r.severity_en),
             "Progress": "",
@@ -100,8 +94,6 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Identifier": r.wire_number,
             "Error title": r.title_en,
             "Explanation": r.explanation_en,
-            "Affected object": r.affected_en,
-            "Where is the issue": r.where_en,
             "Recommendation": _compose_recommendation(r.affected_en, r.where_en, r.recommendation_en),
             "Priority": _legacy_priority(r.severity_en),
             "Progress": "",
@@ -174,15 +166,11 @@ def _format_sheet(ws, sheet_name: str) -> None:
         max_len = max(len(str(c.value or "")) for c in col)
         ws.column_dimensions[col[0].column_letter].width = min(max(max_len + 2, 14), 60)
 
-    where_col_name = "Kde je chyba" if "CZ" in sheet_name else "Where is the issue"
     wire_col_name = "Identifikátor" if "CZ" in sheet_name else "Identifier"
     severity_col_name = "Závažnost" if "CZ" in sheet_name else "Severity"
-    where_col_idx = None
     wire_col_idx = None
     severity_col_idx = None
     for idx, cell in enumerate(ws[1], start=1):
-        if cell.value == where_col_name:
-            where_col_idx = idx
         if cell.value == wire_col_name:
             wire_col_idx = idx
         if cell.value == severity_col_name:
@@ -211,8 +199,6 @@ def _format_sheet(ws, sheet_name: str) -> None:
             if line_count > max_lines:
                 max_lines = line_count
 
-        if where_col_idx:
-            row[where_col_idx - 1].alignment = Alignment(wrap_text=True, vertical="top")
         if wire_col_idx:
             row[wire_col_idx - 1].alignment = Alignment(wrap_text=True, vertical="top")
 
