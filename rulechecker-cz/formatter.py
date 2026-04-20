@@ -42,6 +42,11 @@ EN_COLUMNS = [
 def _legacy_priority(severity_en: str) -> str:
     return "Not OK" if severity_en == "Critical" else "Warning"
 
+
+def _default_progress(severity_en: str) -> str:
+    return "in progress" if severity_en == "Critical" else "done"
+
+
 HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
 CRITICAL_FILLS = [
@@ -81,7 +86,7 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Vysvětlení": r.explanation_cz,
             "Doporučení": _compose_recommendation(r.affected_cz, r.where_cz, r.recommendation_cz),
             "Priority": _legacy_priority(r.severity_en),
-            "Progress": "",
+            "Progress": _default_progress(r.severity_en),
             "Solution": "",
         }
         for r in records
@@ -97,7 +102,7 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Explanation": r.explanation_en,
             "Recommendation": _compose_recommendation(r.affected_en, r.where_en, r.recommendation_en),
             "Priority": _legacy_priority(r.severity_en),
-            "Progress": "",
+            "Progress": _default_progress(r.severity_en),
             "Solution": "",
         }
         for r in records
@@ -168,31 +173,6 @@ def _add_progress_validation(ws) -> None:
     validation = DataValidation(type="list", formula1='"done,in progress,N/A,false"', allow_blank=True)
     ws.add_data_validation(validation)
     validation.add(f"{progress_col_letter}2:{progress_col_letter}{ws.max_row}")
-
-
-def _split_records_by_sheet(records: list[IssueRecord]) -> dict[str, list[IssueRecord]]:
-    return {
-        OUTPUT_SHEET_CZ: records,
-        OUTPUT_SHEET_EN: records,
-    }
-
-
-def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
-    rc_col_idx = None
-    for idx, cell in enumerate(ws[1], start=1):
-        if cell.value == "RC":
-            rc_col_idx = idx
-            break
-
-    if rc_col_idx is None:
-        return
-
-    for row_idx, record in enumerate(sheet_records, start=2):
-        if row_idx > ws.max_row:
-            break
-        cell = ws.cell(row=row_idx, column=rc_col_idx)
-        cell.hyperlink = f"{record.source_file}#'{record.source_sheet}'!A{record.source_row}"
-        cell.style = "Hyperlink"
 
 
 def _format_sheet(ws, sheet_name: str) -> None:

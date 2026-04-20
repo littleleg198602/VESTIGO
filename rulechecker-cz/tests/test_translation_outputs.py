@@ -44,10 +44,10 @@ class TestTranslationOutputs(unittest.TestCase):
             "Leitung 385; Actual color (IST) = br/sw; EN recommendation",
         )
         self.assertEqual(cz.iloc[0]["Priority"], "Not OK")
-        self.assertEqual(cz.iloc[0]["Progress"], "")
+        self.assertEqual(cz.iloc[0]["Progress"], "in progress")
         self.assertEqual(cz.iloc[0]["Solution"], "")
         self.assertEqual(en.iloc[0]["Priority"], "Not OK")
-        self.assertEqual(en.iloc[0]["Progress"], "")
+        self.assertEqual(en.iloc[0]["Progress"], "in progress")
         self.assertEqual(en.iloc[0]["Solution"], "")
 
     def test_output_contains_only_cz_en_overview_sheets(self):
