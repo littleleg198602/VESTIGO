@@ -351,6 +351,14 @@ def _with_sheet_metadata(defn: RCDefinition, name: str, description: str) -> RCD
 
     title_base = name or defn.title_cz
     explanation_base = description or defn.explanation_cz
+    if defn.handler == "rc1":
+        return replace(
+            defn,
+            title_cz=translate_metadata_text(title_base, "cz"),
+            title_en=translate_metadata_text(title_base, "en"),
+            explanation_cz=defn.explanation_cz,
+            explanation_en=defn.explanation_en,
+        )
     return replace(
         defn,
         title_cz=translate_metadata_text(title_base, "cz"),

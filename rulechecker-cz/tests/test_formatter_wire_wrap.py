@@ -42,6 +42,10 @@ class TestFormatterWireWrap(unittest.TestCase):
             self.assertEqual(wire_cell.value, "230003\n230004")
             self.assertTrue(wire_cell.alignment.wrap_text)
             self.assertGreater(ws.row_dimensions[2].height, 15)
+            self.assertIn(
+                ws["A2"].fill.fgColor.value,
+                {"00FDE2E4", "00F8C8CD", "00F5B5BC", "00F29CA7"},
+            )
 
 
 if __name__ == "__main__":

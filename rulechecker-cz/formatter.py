@@ -176,18 +176,25 @@ def _format_sheet(ws, sheet_name: str) -> None:
 
     where_col_name = "Kde je chyba" if "CZ" in sheet_name else "Where is the issue"
     wire_col_name = "Identifikátor" if "CZ" in sheet_name else "Identifier"
+    severity_col_name = "Závažnost" if "CZ" in sheet_name else "Severity"
     where_col_idx = None
     wire_col_idx = None
+    severity_col_idx = None
     for idx, cell in enumerate(ws[1], start=1):
         if cell.value == where_col_name:
             where_col_idx = idx
         if cell.value == wire_col_name:
             wire_col_idx = idx
+        if cell.value == severity_col_name:
+            severity_col_idx = idx
 
     critical_row_idx = 0
     non_critical_row_idx = 0
     for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-        lead_value = str(row[0].value or "")
+        severity_value = ""
+        if severity_col_idx:
+            severity_value = str(row[severity_col_idx - 1].value or "")
+        lead_value = severity_value
         if lead_value in {"Kritické", "Critical"}:
             fill = _pick_fill(lead_value, critical_row_idx)
             critical_row_idx += 1
