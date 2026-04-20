@@ -6,11 +6,6 @@ import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 from config import (
-    CRITICAL_SHEET_CZ,
-    CRITICAL_SHEET_EN,
-    NON_CRITICAL_SHEET_CZ,
-    NON_CRITICAL_SHEET_EN,
-    LEGACY_INSPIRED_SHEET_EN,
     OUTPUT_SHEET_CZ,
     OUTPUT_SHEET_EN,
 )
@@ -45,24 +40,8 @@ EN_COLUMNS = [
     "Solution",
 ]
 
-LEGACY_EN_COLUMNS = [
-    "Number of mistake",
-    "Type of part",
-    "Name of correction",
-    "Task",
-    "Area",
-    "Priority",
-    "Status",
-    "note",
-]
-
-
 def _legacy_priority(severity_en: str) -> str:
     return "Not OK" if severity_en == "Critical" else "Warning"
-
-
-def _legacy_status(severity_en: str) -> str:
-    return "in progress" if severity_en == "Critical" else "done"
 
 HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
@@ -130,29 +109,9 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
     cz_df = pd.DataFrame(cz_rows, columns=CZ_COLUMNS)
     en_df = pd.DataFrame(en_rows, columns=EN_COLUMNS)
 
-    legacy_rows = [
-        {
-            "Number of mistake": f"RC {r.rc}",
-            "Type of part": r.object_type_en,
-            "Name of correction": r.title_en,
-            "Task": r.explanation_en,
-            "Area": "Wiring",
-            "Priority": _legacy_priority(r.severity_en),
-            "Status": _legacy_status(r.severity_en),
-            "note": r.recommendation_en,
-        }
-        for r in records
-    ]
-    legacy_df = pd.DataFrame(legacy_rows, columns=LEGACY_EN_COLUMNS)
-
     return {
         OUTPUT_SHEET_CZ: cz_df,
         OUTPUT_SHEET_EN: en_df,
-        CRITICAL_SHEET_CZ: cz_df[cz_df["Závažnost"] == "Kritické"],
-        CRITICAL_SHEET_EN: en_df[en_df["Severity"] == "Critical"],
-        NON_CRITICAL_SHEET_CZ: cz_df[cz_df["Závažnost"] == "Nekritické"],
-        NON_CRITICAL_SHEET_EN: en_df[en_df["Severity"] == "Non-critical"],
-        LEGACY_INSPIRED_SHEET_EN: legacy_df,
     }
 
 
@@ -173,11 +132,6 @@ def _split_records_by_sheet(records: list[IssueRecord]) -> dict[str, list[IssueR
     return {
         OUTPUT_SHEET_CZ: records,
         OUTPUT_SHEET_EN: records,
-        CRITICAL_SHEET_CZ: [r for r in records if r.severity_cz == "Kritické"],
-        CRITICAL_SHEET_EN: [r for r in records if r.severity_en == "Critical"],
-        NON_CRITICAL_SHEET_CZ: [r for r in records if r.severity_cz == "Nekritické"],
-        NON_CRITICAL_SHEET_EN: [r for r in records if r.severity_en == "Non-critical"],
-        LEGACY_INSPIRED_SHEET_EN: records,
     }
 
 
@@ -226,21 +180,12 @@ def _format_sheet(ws, sheet_name: str) -> None:
     non_critical_row_idx = 0
     for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
         lead_value = str(row[0].value or "")
-        if sheet_name == LEGACY_INSPIRED_SHEET_EN:
-            priority = str(row[5].value or "")
-            if priority == "Not OK":
-                fill = _pick_fill(priority, critical_row_idx)
-                critical_row_idx += 1
-            else:
-                fill = _pick_fill(priority, non_critical_row_idx)
-                non_critical_row_idx += 1
+        if lead_value in {"Kritické", "Critical"}:
+            fill = _pick_fill(lead_value, critical_row_idx)
+            critical_row_idx += 1
         else:
-            if lead_value in {"Kritické", "Critical"}:
-                fill = _pick_fill(lead_value, critical_row_idx)
-                critical_row_idx += 1
-            else:
-                fill = _pick_fill(lead_value, non_critical_row_idx)
-                non_critical_row_idx += 1
+            fill = _pick_fill(lead_value, non_critical_row_idx)
+            non_critical_row_idx += 1
 
         max_lines = 1
         for cell in row:
