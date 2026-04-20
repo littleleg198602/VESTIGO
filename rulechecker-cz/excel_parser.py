@@ -41,6 +41,9 @@ class IssueRecord:
     where_en: str
     recommendation_cz: str
     recommendation_en: str
+    source_file: str = ""
+    source_sheet: str = ""
+    source_row: int = 1
 
 
 def parse_workbook(path: Path) -> list[IssueRecord]:
@@ -72,30 +75,45 @@ def parse_workbook(path: Path) -> list[IssueRecord]:
             continue
 
         defn = _with_sheet_metadata(get_rc_definition(rc), sheet_name_value, sheet_description)
-        records.extend(parse_rc_sheet(df, rc, defn, status_col))
+        records.extend(parse_rc_sheet(df, rc, defn, status_col, source_file=path.name, source_sheet=sheet))
 
     return records
 
 
-def parse_rc_sheet(df: pd.DataFrame, rc: int, defn: RCDefinition, status_col: str = HEADER_STATUS_NAME) -> list[IssueRecord]:
+def parse_rc_sheet(
+    df: pd.DataFrame,
+    rc: int,
+    defn: RCDefinition,
+    status_col: str = HEADER_STATUS_NAME,
+    source_file: str = "",
+    source_sheet: str = "",
+) -> list[IssueRecord]:
     severity_series = df[status_col].map(lambda value: map_status_to_severity(clean_value(value)))
     filtered = df[severity_series.notna()].copy()
     if filtered.empty:
         return []
 
     if defn.handler == "rc121":
-        return _parse_rc121_grouped(filtered, rc, defn, status_col)
+        return _parse_rc121_grouped(filtered, rc, defn, status_col, source_file, source_sheet)
 
     out: list[IssueRecord] = []
     for idx, row in filtered.iterrows():
         severity = severity_series.loc[idx]
         if not severity:
             continue
-        out.append(_build_record_from_row(row, rc, defn, severity.cz, severity.en))
+        source_row = _resolve_source_row(df, idx)
+        out.append(_build_record_from_row(row, rc, defn, severity.cz, severity.en, source_file, source_sheet, source_row))
     return out
 
 
-def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition, status_col: str) -> list[IssueRecord]:
+def _parse_rc121_grouped(
+    df: pd.DataFrame,
+    rc: int,
+    defn: RCDefinition,
+    status_col: str,
+    source_file: str,
+    source_sheet: str,
+) -> list[IssueRecord]:
     key_splice = _find_col(df.columns, ["Splice", "Spleiß", "Splice-Name"])
     key_vobes = _find_col(df.columns, ["VOBES-ID", "VOBES"])
     if not key_splice:
@@ -108,6 +126,7 @@ def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition, status_c
     groups = df.groupby([key_splice, key_vobes], dropna=False)
     out: list[IssueRecord] = []
     for _, group in groups:
+        first_group_idx = group.index[0]
         status = clean_value(group.iloc[0].get(status_col))
         severity = map_status_to_severity(status)
         if not severity:
@@ -152,6 +171,9 @@ def _parse_rc121_grouped(df: pd.DataFrame, rc: int, defn: RCDefinition, status_c
                 where_en=where_en,
                 recommendation_cz=defn.recommendation_cz,
                 recommendation_en=defn.recommendation_en,
+                source_file=source_file,
+                source_sheet=source_sheet,
+                source_row=_resolve_source_row(df, first_group_idx),
             )
         )
     return out
@@ -163,6 +185,9 @@ def _build_record_from_row(
     defn: RCDefinition,
     severity_cz: str,
     severity_en: str,
+    source_file: str,
+    source_sheet: str,
+    source_row: int,
 ) -> IssueRecord:
     affected_cz = _compose_from_columns(row, defn.affected_columns, "cz")
     affected_en = _compose_from_columns(row, defn.affected_columns, "en")
@@ -200,6 +225,9 @@ def _build_record_from_row(
         where_en=where_en,
         recommendation_cz=defn.recommendation_cz,
         recommendation_en=defn.recommendation_en,
+        source_file=source_file,
+        source_sheet=source_sheet,
+        source_row=source_row,
     )
 
 
@@ -233,7 +261,19 @@ def _dataframe_from_raw_sheet(raw: pd.DataFrame) -> pd.DataFrame | None:
     data = raw.iloc[header_idx + 1 :].copy()
     data.columns = _make_unique_headers(header_values)
     data = data.dropna(how="all")
-    return data.reset_index(drop=True)
+    source_rows = list(data.index + 1)
+    out = data.reset_index(drop=True)
+    out.attrs["source_rows"] = source_rows
+    return out
+
+
+def _resolve_source_row(df: pd.DataFrame, idx: int) -> int:
+    source_rows = df.attrs.get("source_rows")
+    if not isinstance(source_rows, list):
+        return int(idx) + 2
+    if idx < 0 or idx >= len(source_rows):
+        return int(idx) + 2
+    return int(source_rows[idx])
 
 
 def _safe_read_rc_sheet(xls: pd.ExcelFile, sheet_name: str) -> pd.DataFrame | None:
