@@ -86,7 +86,11 @@ Mapování stavů je v `severity.py`:
 
 - České listy obsahují i samostatné sloupce `Typ objektu`, `Identifikátor`, `Priority`, `Progress`, `Solution`.
 - Anglické listy obsahují i samostatné sloupce `Object type`, `Identifier`, `Priority`, `Progress`, `Solution`.
+- Na začátku přehledu je nový sloupec se jménem svazku:
+  - CZ: `Název svazku`
+  - EN: `Harness name`
 - `Leitungsnummer` je mapováno do obecného sloupce `Identifikátor` (pro vyhledání čísla drátu, názvu konektoru nebo jiného klíče objektu).
+- Sloupec doporučení obsahuje i sloučené informace z původních detailů (`Čeho se týká` + `Kde je chyba` + doporučení).
 
 - Parser vytváří interní datový model (`IssueRecord`) v `excel_parser.py`.
 - Teprve z interního modelu vznikají DataFrame pro:

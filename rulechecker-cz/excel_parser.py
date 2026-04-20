@@ -11,7 +11,7 @@ from config import HEADER_STATUS_NAME
 from rc_maps import RCDefinition, get_rc_definition
 from severity import map_status_to_severity
 from translators import clean_value, translate_header, translate_metadata_text, translate_value
-from utils import extract_rc_number
+from utils import extract_harness_name, extract_rc_number
 
 LOG = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ class IssueRecord:
     where_en: str
     recommendation_cz: str
     recommendation_en: str
+    harness_name: str = ""
     source_file: str = ""
     source_sheet: str = ""
     source_row: int = 1
@@ -54,6 +55,7 @@ def parse_workbook(path: Path) -> list[IssueRecord]:
         return []
 
     records: list[IssueRecord] = []
+    harness_name = extract_harness_name(path.stem)
     for sheet in xls.sheet_names:
         rc = extract_rc_number(sheet)
         if rc is None:
@@ -75,7 +77,17 @@ def parse_workbook(path: Path) -> list[IssueRecord]:
             continue
 
         defn = _with_sheet_metadata(get_rc_definition(rc), sheet_name_value, sheet_description)
-        records.extend(parse_rc_sheet(df, rc, defn, status_col, source_file=path.name, source_sheet=sheet))
+        records.extend(
+            parse_rc_sheet(
+                df,
+                rc,
+                defn,
+                status_col,
+                source_file=path.name,
+                source_sheet=sheet,
+                harness_name=harness_name,
+            )
+        )
 
     return records
 
@@ -87,6 +99,7 @@ def parse_rc_sheet(
     status_col: str = HEADER_STATUS_NAME,
     source_file: str = "",
     source_sheet: str = "",
+    harness_name: str = "",
 ) -> list[IssueRecord]:
     severity_series = df[status_col].map(lambda value: map_status_to_severity(clean_value(value)))
     filtered = df[severity_series.notna()].copy()
@@ -94,7 +107,7 @@ def parse_rc_sheet(
         return []
 
     if defn.handler == "rc121":
-        return _parse_rc121_grouped(filtered, rc, defn, status_col, source_file, source_sheet)
+        return _parse_rc121_grouped(filtered, rc, defn, status_col, source_file, source_sheet, harness_name)
 
     out: list[IssueRecord] = []
     for idx, row in filtered.iterrows():
@@ -102,7 +115,19 @@ def parse_rc_sheet(
         if not severity:
             continue
         source_row = _resolve_source_row(df, idx)
-        out.append(_build_record_from_row(row, rc, defn, severity.cz, severity.en, source_file, source_sheet, source_row))
+        out.append(
+            _build_record_from_row(
+                row,
+                rc,
+                defn,
+                severity.cz,
+                severity.en,
+                source_file,
+                source_sheet,
+                source_row,
+                harness_name,
+            )
+        )
     return out
 
 
@@ -113,6 +138,7 @@ def _parse_rc121_grouped(
     status_col: str,
     source_file: str,
     source_sheet: str,
+    harness_name: str,
 ) -> list[IssueRecord]:
     key_splice = _find_col(df.columns, ["Splice", "Spleiß", "Splice-Name"])
     key_vobes = _find_col(df.columns, ["VOBES-ID", "VOBES"])
@@ -156,6 +182,7 @@ def _parse_rc121_grouped(
         out.append(
             IssueRecord(
                 rc=rc,
+                harness_name=harness_name,
                 severity_cz=severity.cz,
                 severity_en=severity.en,
                 title_cz=defn.title_cz,
@@ -188,6 +215,7 @@ def _build_record_from_row(
     source_file: str,
     source_sheet: str,
     source_row: int,
+    harness_name: str,
 ) -> IssueRecord:
     affected_cz = _compose_from_columns(row, defn.affected_columns, "cz")
     affected_en = _compose_from_columns(row, defn.affected_columns, "en")
@@ -210,6 +238,7 @@ def _build_record_from_row(
 
     return IssueRecord(
         rc=rc,
+        harness_name=harness_name,
         severity_cz=severity_cz,
         severity_en=severity_en,
         title_cz=defn.title_cz,

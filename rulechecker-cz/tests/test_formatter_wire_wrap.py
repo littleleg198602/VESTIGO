@@ -35,9 +35,12 @@ class TestFormatterWireWrap(unittest.TestCase):
 
             wb = load_workbook(out_path)
             ws = wb["Prehled_CZ"]
+            header_index = {cell.value: idx for idx, cell in enumerate(ws[1], start=1)}
+            wire_col = header_index["Identifikátor"]
+            wire_cell = ws.cell(row=2, column=wire_col)
 
-            self.assertEqual(ws["D2"].value, "230003\n230004")
-            self.assertTrue(ws["D2"].alignment.wrap_text)
+            self.assertEqual(wire_cell.value, "230003\n230004")
+            self.assertTrue(wire_cell.alignment.wrap_text)
             self.assertGreater(ws.row_dimensions[2].height, 15)
 
 

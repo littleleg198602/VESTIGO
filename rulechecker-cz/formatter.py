@@ -12,6 +12,7 @@ from config import (
 from excel_parser import IssueRecord
 
 CZ_COLUMNS = [
+    "Název svazku",
     "Závažnost",
     "RC",
     "Typ objektu",
@@ -26,6 +27,7 @@ CZ_COLUMNS = [
     "Solution",
 ]
 EN_COLUMNS = [
+    "Harness name",
     "Severity",
     "RC",
     "Object type",
@@ -73,6 +75,7 @@ def _pick_fill(severity: str, row_idx: int) -> PatternFill:
 def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
     cz_rows = [
         {
+            "Název svazku": r.harness_name,
             "Závažnost": r.severity_cz,
             "RC": r.rc,
             "Typ objektu": r.object_type_cz,
@@ -81,7 +84,7 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Vysvětlení": r.explanation_cz,
             "Čeho se týká": r.affected_cz,
             "Kde je chyba": r.where_cz,
-            "Doporučení": r.recommendation_cz,
+            "Doporučení": _compose_recommendation(r.affected_cz, r.where_cz, r.recommendation_cz),
             "Priority": _legacy_priority(r.severity_en),
             "Progress": "",
             "Solution": "",
@@ -90,6 +93,7 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
     ]
     en_rows = [
         {
+            "Harness name": r.harness_name,
             "Severity": r.severity_en,
             "RC": r.rc,
             "Object type": r.object_type_en,
@@ -98,7 +102,7 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Explanation": r.explanation_en,
             "Affected object": r.affected_en,
             "Where is the issue": r.where_en,
-            "Recommendation": r.recommendation_en,
+            "Recommendation": _compose_recommendation(r.affected_en, r.where_en, r.recommendation_en),
             "Priority": _legacy_priority(r.severity_en),
             "Progress": "",
             "Solution": "",
@@ -113,6 +117,10 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
         OUTPUT_SHEET_CZ: cz_df,
         OUTPUT_SHEET_EN: en_df,
     }
+
+
+def _compose_recommendation(affected: str, where: str, recommendation: str) -> str:
+    return f"{affected}; {where}; {recommendation}".strip("; ").strip()
 
 
 def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
