@@ -6,11 +6,6 @@ import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 from config import (
-    CRITICAL_SHEET_CZ,
-    CRITICAL_SHEET_EN,
-    NON_CRITICAL_SHEET_CZ,
-    NON_CRITICAL_SHEET_EN,
-    LEGACY_INSPIRED_SHEET_EN,
     OUTPUT_SHEET_CZ,
     OUTPUT_SHEET_EN,
 )
@@ -45,24 +40,8 @@ EN_COLUMNS = [
     "Solution",
 ]
 
-LEGACY_EN_COLUMNS = [
-    "Number of mistake",
-    "Type of part",
-    "Name of correction",
-    "Task",
-    "Area",
-    "Priority",
-    "Status",
-    "note",
-]
-
-
 def _legacy_priority(severity_en: str) -> str:
     return "Not OK" if severity_en == "Critical" else "Warning"
-
-
-def _legacy_status(severity_en: str) -> str:
-    return "in progress" if severity_en == "Critical" else "done"
 
 HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
 HEADER_FONT = Font(color="FFFFFF", bold=True)
@@ -130,41 +109,48 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
     cz_df = pd.DataFrame(cz_rows, columns=CZ_COLUMNS)
     en_df = pd.DataFrame(en_rows, columns=EN_COLUMNS)
 
-    legacy_rows = [
-        {
-            "Number of mistake": f"RC {r.rc}",
-            "Type of part": r.object_type_en,
-            "Name of correction": r.title_en,
-            "Task": r.explanation_en,
-            "Area": "Wiring",
-            "Priority": _legacy_priority(r.severity_en),
-            "Status": _legacy_status(r.severity_en),
-            "note": r.recommendation_en,
-        }
-        for r in records
-    ]
-    legacy_df = pd.DataFrame(legacy_rows, columns=LEGACY_EN_COLUMNS)
-
     return {
         OUTPUT_SHEET_CZ: cz_df,
         OUTPUT_SHEET_EN: en_df,
-        CRITICAL_SHEET_CZ: cz_df[cz_df["Závažnost"] == "Kritické"],
-        CRITICAL_SHEET_EN: en_df[en_df["Severity"] == "Critical"],
-        NON_CRITICAL_SHEET_CZ: cz_df[cz_df["Závažnost"] == "Nekritické"],
-        NON_CRITICAL_SHEET_EN: en_df[en_df["Severity"] == "Non-critical"],
-        LEGACY_INSPIRED_SHEET_EN: legacy_df,
     }
 
 
 def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
     frames = build_output_frames(records)
+    records_by_sheet = _split_records_by_sheet(records)
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         for sheet, df in frames.items():
             df.to_excel(writer, sheet_name=sheet, index=False)
 
         for sheet in frames:
             ws = writer.book[sheet]
+            _add_rc_hyperlinks(ws, records_by_sheet.get(sheet, []))
             _format_sheet(ws, sheet)
+
+
+def _split_records_by_sheet(records: list[IssueRecord]) -> dict[str, list[IssueRecord]]:
+    return {
+        OUTPUT_SHEET_CZ: records,
+        OUTPUT_SHEET_EN: records,
+    }
+
+
+def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
+    rc_col_idx = None
+    for idx, cell in enumerate(ws[1], start=1):
+        if cell.value == "RC":
+            rc_col_idx = idx
+            break
+
+    if rc_col_idx is None:
+        return
+
+    for row_idx, record in enumerate(sheet_records, start=2):
+        if row_idx > ws.max_row:
+            break
+        cell = ws.cell(row=row_idx, column=rc_col_idx)
+        cell.hyperlink = f"{record.source_file}#'{record.source_sheet}'!A{record.source_row}"
+        cell.style = "Hyperlink"
 
 
 def _format_sheet(ws, sheet_name: str) -> None:
@@ -194,21 +180,12 @@ def _format_sheet(ws, sheet_name: str) -> None:
     non_critical_row_idx = 0
     for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
         lead_value = str(row[0].value or "")
-        if sheet_name == LEGACY_INSPIRED_SHEET_EN:
-            priority = str(row[5].value or "")
-            if priority == "Not OK":
-                fill = _pick_fill(priority, critical_row_idx)
-                critical_row_idx += 1
-            else:
-                fill = _pick_fill(priority, non_critical_row_idx)
-                non_critical_row_idx += 1
+        if lead_value in {"Kritické", "Critical"}:
+            fill = _pick_fill(lead_value, critical_row_idx)
+            critical_row_idx += 1
         else:
-            if lead_value in {"Kritické", "Critical"}:
-                fill = _pick_fill(lead_value, critical_row_idx)
-                critical_row_idx += 1
-            else:
-                fill = _pick_fill(lead_value, non_critical_row_idx)
-                non_critical_row_idx += 1
+            fill = _pick_fill(lead_value, non_critical_row_idx)
+            non_critical_row_idx += 1
 
         max_lines = 1
         for cell in row:
