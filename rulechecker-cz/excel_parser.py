@@ -8,7 +8,7 @@ from typing import Iterable
 import pandas as pd
 
 from config import HEADER_STATUS_NAME
-from rc_maps import RCDefinition, get_rc_definition
+from rc_maps import RC_DEFINITIONS, RCDefinition, get_rc_definition
 from severity import map_status_to_severity
 from translators import clean_value, translate_header, translate_metadata_text, translate_value
 from utils import extract_harness_name, extract_rc_number
@@ -346,6 +346,9 @@ def _extract_metadata_value(values: list[str]) -> str:
 
 
 def _with_sheet_metadata(defn: RCDefinition, name: str, description: str) -> RCDefinition:
+    if defn.rc in RC_DEFINITIONS:
+        return defn
+
     if not name and not description:
         return defn
 
