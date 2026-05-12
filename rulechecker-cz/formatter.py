@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import quote
 
 import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -156,7 +157,9 @@ def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
         if row_idx > ws.max_row:
             break
         cell = ws.cell(row=row_idx, column=rc_col_idx)
-        cell.hyperlink = f"{record.source_file}#'{record.source_sheet}'!A{record.source_row}"
+        source_uri = Path(record.source_file).resolve().as_uri()
+        sheet_ref = quote(record.source_sheet, safe="")
+        cell.hyperlink = f"{source_uri}#'{sheet_ref}'!A{record.source_row}"
         cell.style = "Hyperlink"
 
 
