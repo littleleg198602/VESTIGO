@@ -9,7 +9,7 @@ from tkinter import filedialog, messagebox, ttk
 from config import INPUT_DIR, OUTPUT_DIR
 from excel_parser import parse_workbook
 from formatter import write_output_excel
-from utils import build_output_filename, is_generated_output_file
+from utils import build_aggregate_output_filename, is_generated_output_file
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -18,7 +18,9 @@ LOG = logging.getLogger("rulechecker")
 
 def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
     files = sorted(input_dir.glob("*.xlsx"))
-    processed: list[Path] = []
+    all_records = []
+    processed_inputs: list[Path] = []
+
     for file in files:
         if is_generated_output_file(file):
             LOG.info("Přeskakuji vygenerovaný výstup: %s", file.name)
@@ -26,12 +28,18 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
 
         LOG.info("Zpracovávám: %s", file.name)
         records = parse_workbook(file)
-        out_path = build_output_filename(file, output_dir)
-        write_output_excel(out_path, records)
-        LOG.info("Vytvořen výstup: %s (záznamů: %d)", out_path.name, len(records))
-        processed.append(out_path)
+        all_records.extend(records)
+        processed_inputs.append(file)
 
-    return len(processed), processed
+    if not processed_inputs:
+        LOG.info("Nebyly nalezeny žádné vstupní soubory ke zpracování.")
+        return 0, []
+
+    out_path = build_aggregate_output_filename(output_dir)
+    write_output_excel(out_path, all_records)
+    LOG.info("Vytvořen výstup: %s (záznamů: %d, vstupních souborů: %d)", out_path.name, len(all_records), len(processed_inputs))
+    return 1, [out_path]
+
 
 
 def run_gui(default_input_dir: Path, default_output_dir: Path) -> None:
