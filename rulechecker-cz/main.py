@@ -102,9 +102,10 @@ def main() -> None:
     parser.add_argument("--input-dir", type=Path, default=INPUT_DIR, help="Adresář se vstupními .xlsx reporty")
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR, help="Adresář pro výstupy")
     parser.add_argument("--gui", action="store_true", help="Spustí jednoduchou obrazovku pro výběr složek")
+    parser.add_argument("--cli", action="store_true", help="Vynutí konzolové zpracování bez GUI")
     args = parser.parse_args()
 
-    if args.gui:
+    if args.gui or not args.cli:
         run_gui(args.input_dir, args.output_dir)
         return
 
