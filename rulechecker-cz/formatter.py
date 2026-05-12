@@ -133,6 +133,7 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
             ws = writer.book[sheet]
             _add_rc_hyperlinks(ws, records_by_sheet.get(sheet, []))
             _format_sheet(ws, sheet)
+            _add_priority_validation(ws)
             _add_progress_validation(ws)
 
 
@@ -163,6 +164,21 @@ def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
         cell.style = "Hyperlink"
 
 
+def _add_priority_validation(ws) -> None:
+    priority_col_idx = None
+    for idx, cell in enumerate(ws[1], start=1):
+        if cell.value == "Priority":
+            priority_col_idx = idx
+            break
+    if priority_col_idx is None or ws.max_row < 2:
+        return
+
+    priority_col_letter = ws.cell(row=1, column=priority_col_idx).column_letter
+    validation = DataValidation(type="list", formula1='"1,2,3,4,5"', allow_blank=True)
+    ws.add_data_validation(validation)
+    validation.add(f"{priority_col_letter}2:{priority_col_letter}{ws.max_row}")
+
+
 def _add_progress_validation(ws) -> None:
     progress_col_idx = None
     for idx, cell in enumerate(ws[1], start=1):
@@ -173,7 +189,7 @@ def _add_progress_validation(ws) -> None:
         return
 
     progress_col_letter = ws.cell(row=1, column=progress_col_idx).column_letter
-    validation = DataValidation(type="list", formula1='"done,in progress,N/A,false"', allow_blank=True)
+    validation = DataValidation(type="list", formula1='"start,in progress,N/A,done"', allow_blank=True)
     ws.add_data_validation(validation)
     validation.add(f"{progress_col_letter}2:{progress_col_letter}{ws.max_row}")
 
