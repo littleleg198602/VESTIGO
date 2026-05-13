@@ -25,6 +25,7 @@ CZ_COLUMNS = [
     "Priority",
     "Progress",
     "Solution",
+    "HISTORY",
 ]
 EN_COLUMNS = [
     "Harness name",
@@ -38,6 +39,7 @@ EN_COLUMNS = [
     "Priority",
     "Progress",
     "Solution",
+    "HISTORY",
 ]
 
 def _legacy_priority(severity_en: str) -> str:
@@ -89,6 +91,7 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Priority": _legacy_priority(r.severity_en),
             "Progress": _default_progress(r.severity_en),
             "Solution": "",
+            "HISTORY": r.history_note,
         }
         for r in records
     ]
@@ -105,6 +108,7 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Priority": _legacy_priority(r.severity_en),
             "Progress": _default_progress(r.severity_en),
             "Solution": "",
+            "HISTORY": r.history_note,
         }
         for r in records
     ]
