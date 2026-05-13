@@ -45,6 +45,7 @@ class IssueRecord:
     source_file: str = ""
     source_sheet: str = ""
     source_row: int = 1
+    history_note: str = ""
 
 
 def parse_workbook(path: Path) -> list[IssueRecord]:
@@ -83,7 +84,7 @@ def parse_workbook(path: Path) -> list[IssueRecord]:
                 rc,
                 defn,
                 status_col,
-                source_file=path.name,
+                source_file=str(path.resolve()),
                 source_sheet=sheet,
                 harness_name=harness_name,
             )

@@ -40,3 +40,18 @@ def build_output_filename(input_file: Path, output_dir: Path) -> Path:
         if not fallback.exists():
             return fallback
         idx += 1
+
+
+
+def build_aggregate_output_filename(output_dir: Path, prefix: str = "prehled_CZ_EN") -> Path:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    candidate = output_dir / f"{prefix}__{timestamp}.xlsx"
+    if not candidate.exists():
+        return candidate
+
+    idx = 1
+    while True:
+        fallback = output_dir / f"{prefix}__{timestamp}__{idx:02d}.xlsx"
+        if not fallback.exists():
+            return fallback
+        idx += 1
