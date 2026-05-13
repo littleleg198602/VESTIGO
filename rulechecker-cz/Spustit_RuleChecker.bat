@@ -15,7 +15,7 @@ echo.
 echo Pouzity interpreter: %PYTHON_EXE%
 echo.
 
-%PYTHON_EXE% main.py --gui
+%PYTHON_EXE% main.py --cli
 set "EXIT_CODE=%ERRORLEVEL%"
 
 echo.
