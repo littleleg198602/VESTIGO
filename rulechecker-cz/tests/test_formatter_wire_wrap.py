@@ -47,7 +47,8 @@ class TestFormatterWireWrap(unittest.TestCase):
                 {"00FDE2E4", "00F8C8CD", "00F5B5BC", "00F29CA7"},
             )
             validations = list(ws.data_validations.dataValidation)
-            self.assertTrue(any(v.formula1 == '"done,in progress,N/A,false"' for v in validations))
+            self.assertTrue(any(v.formula1 == '"start,in progress,N/A,done"' for v in validations))
+            self.assertTrue(any(v.formula1 == '"1,2,3,4,5"' for v in validations))
 
 
 if __name__ == "__main__":
