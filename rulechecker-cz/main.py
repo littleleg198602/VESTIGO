@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
+import re
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -35,7 +36,7 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
         for rec in records:
             rec.history_note = note_for_rc(history_map, rec.rc)
             rec.history_excel, rec.history_mail = note_split_for_rc(history_map, rec.rc)
-            rec.kurzname = kurzname_map.get(str(rec.wire_number).strip(), "")
+            rec.kurzname = _resolve_kurzname(kurzname_map, rec.wire_number)
         all_records.extend(records)
         processed_inputs.append(file)
 
@@ -91,6 +92,9 @@ def _load_kurzname_map(input_dir: Path) -> dict[str, str]:
                 if not vobes or not kurz or vobes.lower() == "nan" or kurz.lower() == "nan":
                     continue
                 mapping[vobes] = kurz
+                norm = _normalize_vobes(vobes)
+                if norm:
+                    mapping[norm] = kurz
     return mapping
 
 
@@ -126,6 +130,27 @@ def _load_kurzname_from_csv(path: Path, mapping: dict[str, str]) -> None:
         if not vobes or not kurz or vobes.lower() == "nan" or kurz.lower() == "nan":
             continue
         mapping[vobes] = kurz
+        norm = _normalize_vobes(vobes)
+        if norm:
+            mapping[norm] = kurz
+
+
+def _normalize_vobes(value: str) -> str:
+    text = str(value).strip().upper()
+    m = re.search(r"\bX[AB]\.[A-Z0-9]+(?:\.[A-Z0-9]+)*\b", text)
+    if m:
+        return m.group(0)
+    return text
+
+
+def _resolve_kurzname(mapping: dict[str, str], identifier: str) -> str:
+    raw = str(identifier).strip()
+    if not raw:
+        return ""
+    if raw in mapping:
+        return mapping[raw]
+    norm = _normalize_vobes(raw)
+    return mapping.get(norm, "")
 
 
 
