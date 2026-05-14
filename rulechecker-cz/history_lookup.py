@@ -29,6 +29,10 @@ def build_history_map(history_dir: Path) -> dict[int, list[str]]:
     return {rc: vals for rc, vals in notes.items() if vals}
 
 
+def _history_link(path: Path) -> str:
+    return f"[{path.name}]({path.resolve().as_uri()})"
+
+
 def _norm(text: str) -> str:
     text = _clean_excel_text(text).lower()
     return text.replace("_", " ").strip()
@@ -54,7 +58,7 @@ def _load_excel_history(path: Path, out: dict[int, list[str]]) -> None:
                 if not rc_text or not note_text or note_text.lower() == "nan":
                     continue
                 for rc in _extract_rcs(rc_text):
-                    out[rc].append(f"[{path.name}] {note_text[:180]}")
+                    out[rc].append(f"{_history_link(path)} {note_text[:180]}")
             continue
 
         for _, row in df.iterrows():
@@ -63,7 +67,7 @@ def _load_excel_history(path: Path, out: dict[int, list[str]]) -> None:
                 continue
             line = " | ".join(vals)
             for rc in _extract_rcs(line):
-                out[rc].append(_clean_excel_text(f"[{path.name}] {line[:220]}"))
+                out[rc].append(_clean_excel_text(f"{_history_link(path)} {line[:220]}"))
 
 
 def _detect_note_layout(df: pd.DataFrame) -> tuple[int | None, int | None, int | None]:
@@ -93,11 +97,11 @@ def _load_msg_history(path: Path, out: dict[int, list[str]]) -> None:
         if not msg and i + 1 < len(lines):
             msg = lines[i + 1].strip()
         if msg:
-            out[rc].append(f"[{path.name}] {msg[:180]}")
+            out[rc].append(f"{_history_link(path)} {msg[:180]}")
 
     compact = " ".join(text.split())
     for rc in _extract_rcs(compact):
-        out[rc].append(_clean_excel_text(f"[{path.name}] {compact[:220]}"))
+        out[rc].append(_clean_excel_text(f"{_history_link(path)} {compact[:220]}"))
 
 
 def _extract_rcs(text: str) -> set[int]:
