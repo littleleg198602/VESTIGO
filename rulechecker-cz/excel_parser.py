@@ -41,11 +41,14 @@ class IssueRecord:
     where_en: str
     recommendation_cz: str
     recommendation_en: str
+    kurzname: str = ""
     harness_name: str = ""
     source_file: str = ""
     source_sheet: str = ""
     source_row: int = 1
     history_note: str = ""
+    history_excel: str = ""
+    history_mail: str = ""
 
 
 def parse_workbook(path: Path) -> list[IssueRecord]:

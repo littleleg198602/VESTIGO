@@ -6,10 +6,11 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+import pandas as pd
 from config import INPUT_DIR, OUTPUT_DIR
 from excel_parser import parse_workbook
 from formatter import write_output_excel
-from history_lookup import build_history_map, note_for_rc
+from history_lookup import build_history_map, note_for_rc, note_split_for_rc
 from utils import build_aggregate_output_filename, is_generated_output_file
 
 
@@ -22,6 +23,7 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
     all_records = []
     processed_inputs: list[Path] = []
     history_map = build_history_map(input_dir / "HISTORY")
+    kurzname_map = _load_kurzname_map(input_dir)
 
     for file in files:
         if is_generated_output_file(file):
@@ -32,6 +34,8 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
         records = parse_workbook(file)
         for rec in records:
             rec.history_note = note_for_rc(history_map, rec.rc)
+            rec.history_excel, rec.history_mail = note_split_for_rc(history_map, rec.rc)
+            rec.kurzname = kurzname_map.get(str(rec.wire_number).strip(), "")
         all_records.extend(records)
         processed_inputs.append(file)
 
@@ -43,6 +47,42 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
     write_output_excel(out_path, all_records)
     LOG.info("Vytvořen výstup: %s (záznamů: %d, vstupních souborů: %d)", out_path.name, len(all_records), len(processed_inputs))
     return 1, [out_path]
+
+
+def _load_kurzname_map(input_dir: Path) -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    for bom_file in sorted(input_dir.glob("*BOM*.xlsx")):
+        try:
+            xls = pd.ExcelFile(bom_file, engine="openpyxl")
+        except Exception:
+            continue
+        for sheet in xls.sheet_names:
+            try:
+                df = pd.read_excel(xls, sheet_name=sheet, header=None)
+            except Exception:
+                continue
+            header_row = None
+            vobes_col = None
+            kurz_col = None
+            for ridx in range(min(20, len(df.index))):
+                row = [str(v).strip().lower() for v in df.iloc[ridx].tolist()]
+                for cidx, val in enumerate(row):
+                    if "vobes" in val:
+                        vobes_col = cidx
+                    if "kurzname" in val:
+                        kurz_col = cidx
+                if vobes_col is not None and kurz_col is not None:
+                    header_row = ridx
+                    break
+            if header_row is None or vobes_col is None or kurz_col is None:
+                continue
+            for _, row in df.iloc[header_row + 1 :].iterrows():
+                vobes = str(row.iloc[vobes_col] if vobes_col < len(row) else "").strip()
+                kurz = str(row.iloc[kurz_col] if kurz_col < len(row) else "").strip()
+                if not vobes or not kurz or vobes.lower() == "nan" or kurz.lower() == "nan":
+                    continue
+                mapping[vobes] = kurz
+    return mapping
 
 
 
