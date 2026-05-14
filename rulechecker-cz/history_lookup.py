@@ -5,16 +5,14 @@ from collections import defaultdict
 from pathlib import Path
 
 import pandas as pd
+from rc_maps import RC_DEFINITIONS
 
-RC_RE = re.compile(r"\b(?:RC\s*)?(\d{1,4})\b", re.IGNORECASE)
+RC_RE = re.compile(r"\b(?:rc|check|prüfung|prufung)\s*[:#-]?\s*(\d{1,4})\b", re.IGNORECASE)
 INVALID_CHAR_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
-<<<<<<< codex/add-input-output-configuration-interface-ffyimg
 CHECK_BLOCK_RE = re.compile(r"check\s*(\d{1,4})\s*[:\-]?\s*(.+)", re.IGNORECASE)
 
 RC_HEADERS = {"number of mistake", "prufung", "prüfung", "rc", "check"}
 NOTE_HEADERS = {"note", "poznamka", "poznámka", "komentar", "komentář", "comment"}
-=======
->>>>>>> main
 
 
 def build_history_map(history_dir: Path) -> dict[int, list[str]]:
@@ -32,14 +30,15 @@ def build_history_map(history_dir: Path) -> dict[int, list[str]]:
     return {rc: vals for rc, vals in notes.items() if vals}
 
 
-<<<<<<< codex/add-input-output-configuration-interface-ffyimg
+def _history_link(path: Path) -> str:
+    return f"[{path.name}]({path.resolve().as_uri()})"
+
+
 def _norm(text: str) -> str:
     text = _clean_excel_text(text).lower()
     return text.replace("_", " ").strip()
 
 
-=======
->>>>>>> main
 def _load_excel_history(path: Path, out: dict[int, list[str]]) -> None:
     try:
         xls = pd.ExcelFile(path, engine="openpyxl")
@@ -51,19 +50,21 @@ def _load_excel_history(path: Path, out: dict[int, list[str]]) -> None:
             df = pd.read_excel(xls, sheet_name=sheet, header=None)
         except Exception:
             continue
-<<<<<<< codex/add-input-output-configuration-interface-ffyimg
 
         header_row_idx, rc_col, note_col = _detect_note_layout(df)
-        if header_row_idx is None or rc_col is None or note_col is None:
+        if header_row_idx is not None and rc_col is not None and note_col is not None:
+            for _, row in df.iloc[header_row_idx + 1 :].iterrows():
+                rc_text = _clean_excel_text(str(row.iloc[rc_col] if rc_col < len(row) else ""))
+                note_text = _clean_excel_text(str(row.iloc[note_col] if note_col < len(row) else ""))
+                if not rc_text or not note_text or note_text.lower() == "nan":
+                    continue
+                for rc in _extract_rcs_from_rc_cell(rc_text):
+                    out[rc].append(f"{_history_link(path)} {note_text[:180]}")
             continue
 
-        for _, row in df.iloc[header_row_idx + 1 :].iterrows():
-            rc_text = _clean_excel_text(str(row.iloc[rc_col] if rc_col < len(row) else ""))
-            note_text = _clean_excel_text(str(row.iloc[note_col] if note_col < len(row) else ""))
-            if not rc_text or not note_text or note_text.lower() == "nan":
-                continue
-            for rc in _extract_rcs(rc_text):
-                out[rc].append(f"[{path.name}] {note_text[:180]}")
+        # Bez rozpoznaných sloupců RC/Note data raději přeskočíme, aby
+        # nevznikaly falešné přiřazení RC (např. RC1 z běžných čísel v textu).
+        continue
 
 
 def _detect_note_layout(df: pd.DataFrame) -> tuple[int | None, int | None, int | None]:
@@ -75,15 +76,6 @@ def _detect_note_layout(df: pd.DataFrame) -> tuple[int | None, int | None, int |
         if rc_col is not None and note_col is not None:
             return ridx, rc_col, note_col
     return None, None, None
-=======
-        for _, row in df.iterrows():
-            vals = [str(v).strip() for v in row.tolist() if str(v).strip() and str(v).strip().lower() != "nan"]
-            if not vals:
-                continue
-            line = " | ".join(vals)
-            for rc in _extract_rcs(line):
-                out[rc].append(_clean_excel_text(f"[{path.name}] {line[:220]}"))
->>>>>>> main
 
 
 def _load_msg_history(path: Path, out: dict[int, list[str]]) -> None:
@@ -91,7 +83,6 @@ def _load_msg_history(path: Path, out: dict[int, list[str]]) -> None:
         text = path.read_bytes().decode("utf-8", errors="ignore")
     except Exception:
         return
-<<<<<<< codex/add-input-output-configuration-interface-ffyimg
 
     lines = [_clean_excel_text(line) for line in text.splitlines()]
     for i, line in enumerate(lines):
@@ -103,28 +94,28 @@ def _load_msg_history(path: Path, out: dict[int, list[str]]) -> None:
         if not msg and i + 1 < len(lines):
             msg = lines[i + 1].strip()
         if msg:
-            out[rc].append(f"[{path.name}] {msg[:180]}")
-=======
-    compact = " ".join(text.split())
-    for rc in _extract_rcs(compact):
-        out[rc].append(_clean_excel_text(f"[{path.name}] {compact[:220]}"))
->>>>>>> main
-
+            out[rc].append(f"{_history_link(path)} {msg[:180]}")
 
 def _extract_rcs(text: str) -> set[int]:
     result = set()
+    known_rcs = set(RC_DEFINITIONS.keys())
     for m in RC_RE.finditer(text):
-<<<<<<< codex/add-input-output-configuration-interface-ffyimg
-        rc = int(m.group(1))
-=======
         try:
             rc = int(m.group(1))
         except ValueError:
             continue
->>>>>>> main
-        if 1 <= rc <= 9999:
+        if rc in known_rcs:
             result.add(rc)
     return result
+
+
+def _extract_rcs_from_rc_cell(text: str) -> set[int]:
+    cleaned = _clean_excel_text(text).strip()
+    known_rcs = set(RC_DEFINITIONS.keys())
+    if cleaned.isdigit():
+        rc = int(cleaned)
+        return {rc} if rc in known_rcs else set()
+    return _extract_rcs(cleaned)
 
 
 def note_for_rc(history_map: dict[int, list[str]], rc: int) -> str:
@@ -133,16 +124,34 @@ def note_for_rc(history_map: dict[int, list[str]], rc: int) -> str:
         return ""
     unique = []
     seen = set()
+    seen_files = set()
     for e in entries:
         if e in seen:
             continue
+        m = re.match(r"\[([^\]]+)\]\(", e)
+        file_key = m.group(1).lower() if m else ""
+        if file_key and file_key in seen_files:
+            continue
         seen.add(e)
+        if file_key:
+            seen_files.add(file_key)
         unique.append(e)
-<<<<<<< codex/add-input-output-configuration-interface-ffyimg
-    return "\n".join(unique[:3])
-=======
-    return "\n".join(unique[:5])
->>>>>>> main
+    return unique[0] if unique else ""
+
+
+def note_split_for_rc(history_map: dict[int, list[str]], rc: int) -> tuple[str, str]:
+    entries = history_map.get(rc, [])
+    excel_note = ""
+    mail_note = ""
+    for e in entries:
+        low = e.lower()
+        if not excel_note and (".xlsx" in low or ".xls" in low):
+            excel_note = e
+        if not mail_note and ".msg" in low:
+            mail_note = e
+        if excel_note and mail_note:
+            break
+    return excel_note, mail_note
 
 
 def _clean_excel_text(text: str) -> str:
