@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from urllib.parse import quote
 
 import pandas as pd
@@ -25,7 +26,8 @@ CZ_COLUMNS = [
     "Priority",
     "Progress",
     "Solution",
-    "HISTORY",
+    "HISTORY_EXCEL",
+    "HISTORY_MAIL",
 ]
 EN_COLUMNS = [
     "Harness name",
@@ -39,7 +41,8 @@ EN_COLUMNS = [
     "Priority",
     "Progress",
     "Solution",
-    "HISTORY",
+    "HISTORY_EXCEL",
+    "HISTORY_MAIL",
 ]
 
 def _legacy_priority(severity_en: str) -> str:
@@ -91,7 +94,8 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Priority": _legacy_priority(r.severity_en),
             "Progress": _default_progress(r.severity_en),
             "Solution": "",
-            "HISTORY": r.history_note,
+            "HISTORY_EXCEL": r.history_excel,
+            "HISTORY_MAIL": r.history_mail,
         }
         for r in records
     ]
@@ -108,7 +112,8 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Priority": _legacy_priority(r.severity_en),
             "Progress": _default_progress(r.severity_en),
             "Solution": "",
-            "HISTORY": r.history_note,
+            "HISTORY_EXCEL": r.history_excel,
+            "HISTORY_MAIL": r.history_mail,
         }
         for r in records
     ]
@@ -128,6 +133,10 @@ def _compose_recommendation(affected: str, where: str, recommendation: str) -> s
 
 def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
     frames = build_output_frames(records)
+    for key, df in frames.items():
+        drop_cols = [col for col in df.columns if str(col).startswith("HISTORY_LINK_")]
+        if drop_cols:
+            frames[key] = df.drop(columns=drop_cols)
     records_by_sheet = _split_records_by_sheet(records)
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         for sheet, df in frames.items():
@@ -136,6 +145,8 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
         for sheet in frames:
             ws = writer.book[sheet]
             _add_rc_hyperlinks(ws, records_by_sheet.get(sheet, []))
+            _add_history_hyperlinks(ws, "HISTORY_EXCEL")
+            _add_history_hyperlinks(ws, "HISTORY_MAIL")
             _format_sheet(ws, sheet)
             _add_priority_validation(ws)
             _add_progress_validation(ws)
@@ -165,6 +176,26 @@ def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
         source_uri = Path(record.source_file).resolve().as_uri()
         sheet_ref = quote(record.source_sheet, safe="")
         cell.hyperlink = f"{source_uri}#'{sheet_ref}'!A{record.source_row}"
+        cell.style = "Hyperlink"
+
+
+def _add_history_hyperlinks(ws, column_name: str) -> None:
+    history_col_idx = None
+    for idx, cell in enumerate(ws[1], start=1):
+        if cell.value == column_name:
+            history_col_idx = idx
+            break
+    if history_col_idx is None:
+        return
+
+    for row_idx in range(2, ws.max_row + 1):
+        cell = ws.cell(row=row_idx, column=history_col_idx)
+        text = str(cell.value or "")
+        m = re.search(r"\[([^\]]+)\]\((file://[^)]+)\)", text)
+        if not m:
+            continue
+        cell.value = re.sub(r"\[([^\]]+)\]\((file://[^)]+)\)", r"[\1]", text)
+        cell.hyperlink = m.group(2)
         cell.style = "Hyperlink"
 
 
