@@ -3,13 +3,15 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
+import re
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+import pandas as pd
 from config import INPUT_DIR, OUTPUT_DIR
 from excel_parser import parse_workbook
 from formatter import write_output_excel
-from history_lookup import build_history_map, note_for_rc
+from history_lookup import build_history_map, note_for_rc, note_split_for_rc
 from utils import build_aggregate_output_filename, is_generated_output_file
 
 
@@ -22,6 +24,7 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
     all_records = []
     processed_inputs: list[Path] = []
     history_map = build_history_map(input_dir / "HISTORY")
+    kurzname_map = _load_kurzname_map(input_dir)
 
     for file in files:
         if is_generated_output_file(file):
@@ -32,6 +35,8 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
         records = parse_workbook(file)
         for rec in records:
             rec.history_note = note_for_rc(history_map, rec.rc)
+            rec.history_excel, rec.history_mail = note_split_for_rc(history_map, rec.rc)
+            rec.kurzname = _resolve_kurzname(kurzname_map, rec.wire_number)
         all_records.extend(records)
         processed_inputs.append(file)
 
@@ -43,6 +48,116 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
     write_output_excel(out_path, all_records)
     LOG.info("Vytvořen výstup: %s (záznamů: %d, vstupních souborů: %d)", out_path.name, len(all_records), len(processed_inputs))
     return 1, [out_path]
+
+
+def _load_kurzname_map(input_dir: Path) -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    bom_candidates = list(input_dir.glob("*BOM*.xlsx"))
+    bom_dir = input_dir / "BOM"
+    if bom_dir.exists():
+        bom_candidates.extend(sorted(bom_dir.glob("*BOM*.xlsx")))
+        bom_candidates.extend(sorted(bom_dir.glob("*BOM*.csv")))
+
+    for bom_file in sorted(bom_candidates):
+        if bom_file.suffix.lower() == ".csv":
+            _load_kurzname_from_csv(bom_file, mapping)
+            continue
+        try:
+            xls = pd.ExcelFile(bom_file, engine="openpyxl")
+        except Exception:
+            continue
+        for sheet in xls.sheet_names:
+            try:
+                df = pd.read_excel(xls, sheet_name=sheet, header=None)
+            except Exception:
+                continue
+            header_row = None
+            vobes_col = None
+            kurz_col = None
+            for ridx in range(min(20, len(df.index))):
+                row = [str(v).strip().lower() for v in df.iloc[ridx].tolist()]
+                for cidx, val in enumerate(row):
+                    if "vobes" in val:
+                        vobes_col = cidx
+                    if "kurzname" in val:
+                        kurz_col = cidx
+                if vobes_col is not None and kurz_col is not None:
+                    header_row = ridx
+                    break
+            if header_row is None or vobes_col is None or kurz_col is None:
+                # Fallback pro čitelné BOM XLSX se známým layoutem:
+                # VOBES bývá ve sloupci B, Kurzname ve sloupci E.
+                if len(df.columns) >= 5:
+                    header_row = 2
+                    vobes_col = 1
+                    kurz_col = 4
+                else:
+                    continue
+            for _, row in df.iloc[header_row + 1 :].iterrows():
+                vobes = str(row.iloc[vobes_col] if vobes_col < len(row) else "").strip()
+                kurz = str(row.iloc[kurz_col] if kurz_col < len(row) else "").strip()
+                if not vobes or not kurz or vobes.lower() == "nan" or kurz.lower() == "nan":
+                    continue
+                mapping[vobes] = kurz
+                norm = _normalize_vobes(vobes)
+                if norm:
+                    mapping[norm] = kurz
+    return mapping
+
+
+def _load_kurzname_from_csv(path: Path, mapping: dict[str, str]) -> None:
+    try:
+        df = pd.read_csv(path, sep=None, engine="python", header=None, dtype=str, encoding="utf-8")
+    except Exception:
+        try:
+            df = pd.read_csv(path, sep=";", header=None, dtype=str, encoding="latin-1")
+        except Exception:
+            return
+
+    header_row = None
+    vobes_col = None
+    kurz_col = None
+    for ridx in range(min(20, len(df.index))):
+        row = [str(v).strip().lower() for v in df.iloc[ridx].tolist()]
+        for cidx, val in enumerate(row):
+            if "vobes" in val:
+                vobes_col = cidx
+            if "kurzname" in val:
+                kurz_col = cidx
+        if vobes_col is not None and kurz_col is not None:
+            header_row = ridx
+            break
+
+    if header_row is None or vobes_col is None or kurz_col is None:
+        return
+
+    for _, row in df.iloc[header_row + 1 :].iterrows():
+        vobes = str(row.iloc[vobes_col] if vobes_col < len(row) else "").strip()
+        kurz = str(row.iloc[kurz_col] if kurz_col < len(row) else "").strip()
+        if not vobes or not kurz or vobes.lower() == "nan" or kurz.lower() == "nan":
+            continue
+        mapping[vobes] = kurz
+        norm = _normalize_vobes(vobes)
+        if norm:
+            mapping[norm] = kurz
+
+
+def _normalize_vobes(value: str) -> str:
+    text = str(value).strip().upper()
+    m = re.search(r"\bX[AB]\.[A-Z0-9]+(?:\.[A-Z0-9]+)*\b", text)
+    if m:
+        return m.group(0)
+    return text
+
+
+def _resolve_kurzname(mapping: dict[str, str], identifier: str) -> str:
+    raw = str(identifier).strip()
+    if not raw:
+        return ""
+    if raw in mapping:
+        return mapping[raw]
+    norm = _normalize_vobes(raw)
+    return mapping.get(norm, "")
 
 
 
