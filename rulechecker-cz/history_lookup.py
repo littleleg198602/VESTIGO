@@ -58,7 +58,7 @@ def _load_excel_history(path: Path, out: dict[int, list[str]]) -> None:
                 note_text = _clean_excel_text(str(row.iloc[note_col] if note_col < len(row) else ""))
                 if not rc_text or not note_text or note_text.lower() == "nan":
                     continue
-                for rc in _extract_rcs(rc_text):
+                for rc in _extract_rcs_from_rc_cell(rc_text):
                     out[rc].append(f"{_history_link(path)} {note_text[:180]}")
             continue
 
@@ -107,6 +107,15 @@ def _extract_rcs(text: str) -> set[int]:
         if rc in known_rcs:
             result.add(rc)
     return result
+
+
+def _extract_rcs_from_rc_cell(text: str) -> set[int]:
+    cleaned = _clean_excel_text(text).strip()
+    known_rcs = set(RC_DEFINITIONS.keys())
+    if cleaned.isdigit():
+        rc = int(cleaned)
+        return {rc} if rc in known_rcs else set()
+    return _extract_rcs(cleaned)
 
 
 def note_for_rc(history_map: dict[int, list[str]], rc: int) -> str:
