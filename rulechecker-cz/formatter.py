@@ -158,7 +158,6 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
             ws = writer.book[sheet]
             _add_rc_hyperlinks(ws, records_by_sheet.get(sheet, []))
             _add_history_hyperlinks(ws)
-            _add_history_link_columns_hyperlinks(ws)
             _format_sheet(ws, sheet)
             _add_priority_validation(ws)
             _add_progress_validation(ws)
@@ -215,24 +214,6 @@ def _add_history_hyperlinks(ws) -> None:
         cell.hyperlink = m.group(2)
         cell.style = "Hyperlink"
 
-
-def _add_history_link_columns_hyperlinks(ws) -> None:
-    cols = []
-    for idx, cell in enumerate(ws[1], start=1):
-        if str(cell.value).startswith("HISTORY_LINK_"):
-            cols.append(idx)
-
-    for col_idx in cols:
-        for row_idx in range(2, ws.max_row + 1):
-            cell = ws.cell(row=row_idx, column=col_idx)
-            text = str(cell.value or "")
-            m = re.search(r"\[([^\]]+)\]\((file://[^)]+)\)", text)
-            if not m:
-                continue
-            cleaned = re.sub(r"\[([^\]]+)\]\((file://[^)]+)\)", r"[\1]", text)
-            cell.value = cleaned
-            cell.hyperlink = m.group(2)
-            cell.style = "Hyperlink"
 
 def _add_priority_validation(ws) -> None:
     priority_col_idx = None

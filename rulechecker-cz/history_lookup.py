@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 from rc_maps import RC_DEFINITIONS
 
-RC_RE = re.compile(r"\b(?:RC\s*)?(\d{1,4})\b", re.IGNORECASE)
+RC_RE = re.compile(r"\b(?:rc|check|prüfung|prufung)\s*[:#-]?\s*(\d{1,4})\b", re.IGNORECASE)
 INVALID_CHAR_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
 CHECK_BLOCK_RE = re.compile(r"check\s*(\d{1,4})\s*[:\-]?\s*(.+)", re.IGNORECASE)
 
@@ -62,13 +62,9 @@ def _load_excel_history(path: Path, out: dict[int, list[str]]) -> None:
                     out[rc].append(f"{_history_link(path)} {note_text[:180]}")
             continue
 
-        for _, row in df.iterrows():
-            vals = [str(v).strip() for v in row.tolist() if str(v).strip() and str(v).strip().lower() != "nan"]
-            if not vals:
-                continue
-            line = " | ".join(vals)
-            for rc in _extract_rcs(line):
-                out[rc].append(_clean_excel_text(f"{_history_link(path)} {line[:220]}"))
+        # Bez rozpoznaných sloupců RC/Note data raději přeskočíme, aby
+        # nevznikaly falešné přiřazení RC (např. RC1 z běžných čísel v textu).
+        continue
 
 
 def _detect_note_layout(df: pd.DataFrame) -> tuple[int | None, int | None, int | None]:
@@ -100,11 +96,6 @@ def _load_msg_history(path: Path, out: dict[int, list[str]]) -> None:
         if msg:
             out[rc].append(f"{_history_link(path)} {msg[:180]}")
 
-    compact = " ".join(text.split())
-    for rc in _extract_rcs(compact):
-        out[rc].append(_clean_excel_text(f"{_history_link(path)} {compact[:220]}"))
-
-
 def _extract_rcs(text: str) -> set[int]:
     result = set()
     known_rcs = set(RC_DEFINITIONS.keys())
@@ -124,10 +115,17 @@ def note_for_rc(history_map: dict[int, list[str]], rc: int) -> str:
         return ""
     unique = []
     seen = set()
+    seen_files = set()
     for e in entries:
         if e in seen:
             continue
+        m = re.match(r"\[([^\]]+)\]\(", e)
+        file_key = m.group(1).lower() if m else ""
+        if file_key and file_key in seen_files:
+            continue
         seen.add(e)
+        if file_key:
+            seen_files.add(file_key)
         unique.append(e)
     return "\n".join(unique[:5])
 
