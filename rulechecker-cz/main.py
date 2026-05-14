@@ -51,7 +51,16 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
 
 def _load_kurzname_map(input_dir: Path) -> dict[str, str]:
     mapping: dict[str, str] = {}
-    for bom_file in sorted(input_dir.glob("*BOM*.xlsx")):
+    bom_candidates = list(input_dir.glob("*BOM*.xlsx"))
+    bom_dir = input_dir / "BOM"
+    if bom_dir.exists():
+        bom_candidates.extend(sorted(bom_dir.glob("*BOM*.xlsx")))
+        bom_candidates.extend(sorted(bom_dir.glob("*BOM*.csv")))
+
+    for bom_file in sorted(bom_candidates):
+        if bom_file.suffix.lower() == ".csv":
+            _load_kurzname_from_csv(bom_file, mapping)
+            continue
         try:
             xls = pd.ExcelFile(bom_file, engine="openpyxl")
         except Exception:
@@ -83,6 +92,40 @@ def _load_kurzname_map(input_dir: Path) -> dict[str, str]:
                     continue
                 mapping[vobes] = kurz
     return mapping
+
+
+def _load_kurzname_from_csv(path: Path, mapping: dict[str, str]) -> None:
+    try:
+        df = pd.read_csv(path, sep=None, engine="python", header=None, dtype=str, encoding="utf-8")
+    except Exception:
+        try:
+            df = pd.read_csv(path, sep=";", header=None, dtype=str, encoding="latin-1")
+        except Exception:
+            return
+
+    header_row = None
+    vobes_col = None
+    kurz_col = None
+    for ridx in range(min(20, len(df.index))):
+        row = [str(v).strip().lower() for v in df.iloc[ridx].tolist()]
+        for cidx, val in enumerate(row):
+            if "vobes" in val:
+                vobes_col = cidx
+            if "kurzname" in val:
+                kurz_col = cidx
+        if vobes_col is not None and kurz_col is not None:
+            header_row = ridx
+            break
+
+    if header_row is None or vobes_col is None or kurz_col is None:
+        return
+
+    for _, row in df.iloc[header_row + 1 :].iterrows():
+        vobes = str(row.iloc[vobes_col] if vobes_col < len(row) else "").strip()
+        kurz = str(row.iloc[kurz_col] if kurz_col < len(row) else "").strip()
+        if not vobes or not kurz or vobes.lower() == "nan" or kurz.lower() == "nan":
+            continue
+        mapping[vobes] = kurz
 
 
 
