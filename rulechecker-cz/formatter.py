@@ -45,6 +45,14 @@ EN_COLUMNS = [
     "HISTORY_MAIL",
 ]
 
+
+def _history_link_columns(history_note: str) -> dict[str, str]:
+    lines = [line.strip() for line in history_note.splitlines() if line.strip()]
+    out = {}
+    for idx in range(5):
+        out[f"HISTORY_LINK_{idx + 1}"] = lines[idx] if idx < len(lines) else ""
+    return out
+
 def _legacy_priority(severity_en: str) -> str:
     return "Not OK" if severity_en == "Critical" else "Warning"
 
