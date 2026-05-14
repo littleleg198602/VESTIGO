@@ -130,6 +130,21 @@ def note_for_rc(history_map: dict[int, list[str]], rc: int) -> str:
     return unique[0] if unique else ""
 
 
+def note_split_for_rc(history_map: dict[int, list[str]], rc: int) -> tuple[str, str]:
+    entries = history_map.get(rc, [])
+    excel_note = ""
+    mail_note = ""
+    for e in entries:
+        low = e.lower()
+        if not excel_note and (".xlsx" in low or ".xls" in low):
+            excel_note = e
+        if not mail_note and ".msg" in low:
+            mail_note = e
+        if excel_note and mail_note:
+            break
+    return excel_note, mail_note
+
+
 def _clean_excel_text(text: str) -> str:
     text = INVALID_CHAR_RE.sub("", text)
     return " ".join(text.split())

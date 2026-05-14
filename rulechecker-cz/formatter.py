@@ -26,12 +26,8 @@ CZ_COLUMNS = [
     "Priority",
     "Progress",
     "Solution",
-    "HISTORY",
-    "HISTORY_LINK_1",
-    "HISTORY_LINK_2",
-    "HISTORY_LINK_3",
-    "HISTORY_LINK_4",
-    "HISTORY_LINK_5",
+    "HISTORY_EXCEL",
+    "HISTORY_MAIL",
 ]
 EN_COLUMNS = [
     "Harness name",
@@ -45,12 +41,8 @@ EN_COLUMNS = [
     "Priority",
     "Progress",
     "Solution",
-    "HISTORY",
-    "HISTORY_LINK_1",
-    "HISTORY_LINK_2",
-    "HISTORY_LINK_3",
-    "HISTORY_LINK_4",
-    "HISTORY_LINK_5",
+    "HISTORY_EXCEL",
+    "HISTORY_MAIL",
 ]
 
 
@@ -110,8 +102,8 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Priority": _legacy_priority(r.severity_en),
             "Progress": _default_progress(r.severity_en),
             "Solution": "",
-            "HISTORY": r.history_note,
-            **_history_link_columns(r.history_note),
+            "HISTORY_EXCEL": r.history_excel,
+            "HISTORY_MAIL": r.history_mail,
         }
         for r in records
     ]
@@ -128,8 +120,8 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Priority": _legacy_priority(r.severity_en),
             "Progress": _default_progress(r.severity_en),
             "Solution": "",
-            "HISTORY": r.history_note,
-            **_history_link_columns(r.history_note),
+            "HISTORY_EXCEL": r.history_excel,
+            "HISTORY_MAIL": r.history_mail,
         }
         for r in records
     ]
@@ -161,7 +153,8 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
         for sheet in frames:
             ws = writer.book[sheet]
             _add_rc_hyperlinks(ws, records_by_sheet.get(sheet, []))
-            _add_history_hyperlinks(ws)
+            _add_history_hyperlinks(ws, "HISTORY_EXCEL")
+            _add_history_hyperlinks(ws, "HISTORY_MAIL")
             _format_sheet(ws, sheet)
             _add_priority_validation(ws)
             _add_progress_validation(ws)
@@ -194,10 +187,10 @@ def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
         cell.style = "Hyperlink"
 
 
-def _add_history_hyperlinks(ws) -> None:
+def _add_history_hyperlinks(ws, column_name: str) -> None:
     history_col_idx = None
     for idx, cell in enumerate(ws[1], start=1):
-        if cell.value == "HISTORY":
+        if cell.value == column_name:
             history_col_idx = idx
             break
     if history_col_idx is None:
