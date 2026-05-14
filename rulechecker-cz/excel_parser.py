@@ -41,6 +41,7 @@ class IssueRecord:
     where_en: str
     recommendation_cz: str
     recommendation_en: str
+    kurzname: str = ""
     harness_name: str = ""
     source_file: str = ""
     source_sheet: str = ""
