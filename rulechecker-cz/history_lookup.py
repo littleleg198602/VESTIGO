@@ -5,6 +5,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import pandas as pd
+from rc_maps import RC_DEFINITIONS
 
 RC_RE = re.compile(r"\b(?:RC\s*)?(\d{1,4})\b", re.IGNORECASE)
 INVALID_CHAR_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
@@ -106,12 +107,13 @@ def _load_msg_history(path: Path, out: dict[int, list[str]]) -> None:
 
 def _extract_rcs(text: str) -> set[int]:
     result = set()
+    known_rcs = set(RC_DEFINITIONS.keys())
     for m in RC_RE.finditer(text):
         try:
             rc = int(m.group(1))
         except ValueError:
             continue
-        if 1 <= rc <= 9999:
+        if rc in known_rcs:
             result.add(rc)
     return result
 
