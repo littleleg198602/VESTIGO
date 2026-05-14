@@ -9,7 +9,7 @@ from tkinter import filedialog, messagebox, ttk
 from config import INPUT_DIR, OUTPUT_DIR
 from excel_parser import parse_workbook
 from formatter import write_output_excel
-from history_lookup import build_history_map, note_for_rc
+from history_lookup import build_history_map, note_for_rc, note_split_for_rc
 from utils import build_aggregate_output_filename, is_generated_output_file
 
 
@@ -32,6 +32,7 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
         records = parse_workbook(file)
         for rec in records:
             rec.history_note = note_for_rc(history_map, rec.rc)
+            rec.history_excel, rec.history_mail = note_split_for_rc(history_map, rec.rc)
         all_records.extend(records)
         processed_inputs.append(file)
 
