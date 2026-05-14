@@ -127,7 +127,7 @@ def note_for_rc(history_map: dict[int, list[str]], rc: int) -> str:
         if file_key:
             seen_files.add(file_key)
         unique.append(e)
-    return "\n".join(unique[:5])
+    return unique[0] if unique else ""
 
 
 def _clean_excel_text(text: str) -> str:
