@@ -168,6 +168,11 @@ def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
         cell.style = "Hyperlink"
 
 
+def _add_history_hyperlinks(ws) -> None:
+    """Backward-compatible no-op for older launchers/local copies."""
+    return
+
+
 def _add_priority_validation(ws) -> None:
     priority_col_idx = None
     for idx, cell in enumerate(ws[1], start=1):
