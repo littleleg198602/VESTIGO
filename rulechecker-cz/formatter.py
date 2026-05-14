@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from urllib.parse import quote
 
 import pandas as pd
@@ -26,6 +27,11 @@ CZ_COLUMNS = [
     "Progress",
     "Solution",
     "HISTORY",
+    "HISTORY_LINK_1",
+    "HISTORY_LINK_2",
+    "HISTORY_LINK_3",
+    "HISTORY_LINK_4",
+    "HISTORY_LINK_5",
 ]
 EN_COLUMNS = [
     "Harness name",
@@ -40,7 +46,20 @@ EN_COLUMNS = [
     "Progress",
     "Solution",
     "HISTORY",
+    "HISTORY_LINK_1",
+    "HISTORY_LINK_2",
+    "HISTORY_LINK_3",
+    "HISTORY_LINK_4",
+    "HISTORY_LINK_5",
 ]
+
+
+def _history_link_columns(history_note: str) -> dict[str, str]:
+    lines = [line.strip() for line in history_note.splitlines() if line.strip()]
+    out = {}
+    for idx in range(5):
+        out[f"HISTORY_LINK_{idx + 1}"] = lines[idx] if idx < len(lines) else ""
+    return out
 
 def _legacy_priority(severity_en: str) -> str:
     return "Not OK" if severity_en == "Critical" else "Warning"
@@ -92,6 +111,7 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Progress": _default_progress(r.severity_en),
             "Solution": "",
             "HISTORY": r.history_note,
+            **_history_link_columns(r.history_note),
         }
         for r in records
     ]
@@ -109,6 +129,7 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Progress": _default_progress(r.severity_en),
             "Solution": "",
             "HISTORY": r.history_note,
+            **_history_link_columns(r.history_note),
         }
         for r in records
     ]
@@ -136,6 +157,8 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
         for sheet in frames:
             ws = writer.book[sheet]
             _add_rc_hyperlinks(ws, records_by_sheet.get(sheet, []))
+            _add_history_hyperlinks(ws)
+            _add_history_link_columns_hyperlinks(ws)
             _format_sheet(ws, sheet)
             _add_priority_validation(ws)
             _add_progress_validation(ws)
@@ -167,6 +190,49 @@ def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
         cell.hyperlink = f"{source_uri}#'{sheet_ref}'!A{record.source_row}"
         cell.style = "Hyperlink"
 
+
+
+
+def _add_history_hyperlinks(ws) -> None:
+    history_col_idx = None
+    for idx, cell in enumerate(ws[1], start=1):
+        if cell.value == "HISTORY":
+            history_col_idx = idx
+            break
+
+    if history_col_idx is None:
+        return
+
+    for row_idx in range(2, ws.max_row + 1):
+        cell = ws.cell(row=row_idx, column=history_col_idx)
+        text = str(cell.value or "")
+        m = re.search(r"\[([^\]]+)\]\((file://[^)]+)\)", text)
+        if not m:
+            continue
+
+        cleaned = re.sub(r"\[([^\]]+)\]\((file://[^)]+)\)", r"[\1]", text)
+        cell.value = cleaned
+        cell.hyperlink = m.group(2)
+        cell.style = "Hyperlink"
+
+
+def _add_history_link_columns_hyperlinks(ws) -> None:
+    cols = []
+    for idx, cell in enumerate(ws[1], start=1):
+        if str(cell.value).startswith("HISTORY_LINK_"):
+            cols.append(idx)
+
+    for col_idx in cols:
+        for row_idx in range(2, ws.max_row + 1):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            text = str(cell.value or "")
+            m = re.search(r"\[([^\]]+)\]\((file://[^)]+)\)", text)
+            if not m:
+                continue
+            cleaned = re.sub(r"\[([^\]]+)\]\((file://[^)]+)\)", r"[\1]", text)
+            cell.value = cleaned
+            cell.hyperlink = m.group(2)
+            cell.style = "Hyperlink"
 
 def _add_priority_validation(ws) -> None:
     priority_col_idx = None
