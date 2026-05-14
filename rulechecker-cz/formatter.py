@@ -192,29 +192,6 @@ def _add_rc_hyperlinks(ws, sheet_records: list[IssueRecord]) -> None:
 
 
 
-def _add_history_hyperlinks(ws) -> None:
-    history_col_idx = None
-    for idx, cell in enumerate(ws[1], start=1):
-        if cell.value == "HISTORY":
-            history_col_idx = idx
-            break
-
-    if history_col_idx is None:
-        return
-
-    for row_idx in range(2, ws.max_row + 1):
-        cell = ws.cell(row=row_idx, column=history_col_idx)
-        text = str(cell.value or "")
-        m = re.search(r"\[([^\]]+)\]\((file://[^)]+)\)", text)
-        if not m:
-            continue
-
-        cleaned = re.sub(r"\[([^\]]+)\]\((file://[^)]+)\)", r"[\1]", text)
-        cell.value = cleaned
-        cell.hyperlink = m.group(2)
-        cell.style = "Hyperlink"
-
-
 def _add_priority_validation(ws) -> None:
     priority_col_idx = None
     for idx, cell in enumerate(ws[1], start=1):

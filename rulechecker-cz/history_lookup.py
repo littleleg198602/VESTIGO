@@ -31,7 +31,7 @@ def build_history_map(history_dir: Path) -> dict[int, list[str]]:
 
 
 def _history_link(path: Path) -> str:
-    return f"[{path.name}]({path.resolve().as_uri()})"
+    return f"[{path.name}]"
 
 
 def _norm(text: str) -> str:
@@ -119,7 +119,7 @@ def note_for_rc(history_map: dict[int, list[str]], rc: int) -> str:
     for e in entries:
         if e in seen:
             continue
-        m = re.match(r"\[([^\]]+)\]\(", e)
+        m = re.match(r"\[([^\]]+)\]", e)
         file_key = m.group(1).lower() if m else ""
         if file_key and file_key in seen_files:
             continue
