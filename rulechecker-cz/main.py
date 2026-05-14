@@ -85,7 +85,14 @@ def _load_kurzname_map(input_dir: Path) -> dict[str, str]:
                     header_row = ridx
                     break
             if header_row is None or vobes_col is None or kurz_col is None:
-                continue
+                # Fallback pro čitelné BOM XLSX se známým layoutem:
+                # VOBES bývá ve sloupci B, Kurzname ve sloupci E.
+                if len(df.columns) >= 5:
+                    header_row = 2
+                    vobes_col = 1
+                    kurz_col = 4
+                else:
+                    continue
             for _, row in df.iloc[header_row + 1 :].iterrows():
                 vobes = str(row.iloc[vobes_col] if vobes_col < len(row) else "").strip()
                 kurz = str(row.iloc[kurz_col] if kurz_col < len(row) else "").strip()
