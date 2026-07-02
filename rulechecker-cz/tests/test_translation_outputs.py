@@ -35,14 +35,11 @@ class TestTranslationOutputs(unittest.TestCase):
         self.assertEqual(en.iloc[0]["Harness name"], "")
         self.assertEqual(en.iloc[0]["Object type"], "Wire")
         self.assertEqual(en.iloc[0]["Error title"], "Wire and signal color consistency")
-        self.assertEqual(
-            cz.iloc[0]["Doporučení"],
-            "Leitung 385; Skutečná barva (IST) = br/sw; CZ doporučení",
-        )
-        self.assertEqual(
-            en.iloc[0]["Recommendation"],
-            "Leitung 385; Actual color (IST) = br/sw; EN recommendation",
-        )
+        self.assertEqual(cz.iloc[0]["Doporučení"], "CZ doporučení")
+        self.assertEqual(en.iloc[0]["Recommendation"], "EN recommendation")
+        self.assertIn("Notes", cz.columns)
+        self.assertLess(cz.columns.get_loc("Solution"), cz.columns.get_loc("Notes"))
+        self.assertLess(cz.columns.get_loc("Notes"), cz.columns.get_loc("HISTORY_EXCEL"))
         self.assertEqual(cz.iloc[0]["Priority"], "Not OK")
         self.assertEqual(cz.iloc[0]["Progress"], "in progress")
         self.assertEqual(cz.iloc[0]["Solution"], "")
