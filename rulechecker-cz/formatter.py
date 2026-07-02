@@ -161,7 +161,7 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
 
         cz_df = frames[OUTPUT_SHEET_CZ].copy()
         cz_df.to_excel(writer, sheet_name="CZ_Data", index=False)
-        _write_rc_harness_outline_sheet(writer.book, cz_df)
+        _write_rc_harness_outline_sheet(writer.book, cz_df, records_by_sheet.get(OUTPUT_SHEET_CZ, []))
         _write_rc_summary_sheet(writer.book, cz_df)
         _write_help_sheet(writer.book)
 
@@ -182,6 +182,10 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
         _add_priority_validation(cz_data_ws)
         _add_progress_validation(cz_data_ws)
 
+        outline_ws = writer.book["CZ_RC_Svazek"]
+        _add_history_hyperlinks(outline_ws, "HISTORY_EXCEL")
+        _add_history_hyperlinks(outline_ws, "HISTORY_MAIL")
+
 
 
 def _sort_cz_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -194,10 +198,17 @@ def _sort_cz_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return work.sort_values(by=by, kind="mergesort", na_position="last").drop(columns=["__rc_sort"])
 
 
-def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
+def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame, records: list[IssueRecord]) -> None:
     ws = wb.create_sheet("CZ_RC_Svazek", 0)
-    df = _sort_cz_dataframe(cz_df)
-    columns = list(df.columns)
+    source_df = cz_df.copy()
+    padded_records = records[: len(source_df)]
+    missing_count = len(source_df) - len(padded_records)
+    source_df["__source_file"] = [record.source_file for record in padded_records] + [""] * missing_count
+    source_df["__source_sheet"] = [record.source_sheet for record in padded_records] + [""] * missing_count
+    source_df["__source_row"] = [record.source_row for record in padded_records] + [1] * missing_count
+    df = _sort_cz_dataframe(source_df)
+    source_columns = {"__source_file", "__source_sheet", "__source_row"}
+    columns = [col for col in df.columns if col not in source_columns]
     detail_severity_col_name = "Závažnost detailu"
     outline_label_col_name = "RC chyba"
     outline_columns = [outline_label_col_name] + columns + ([detail_severity_col_name] if "Závažnost" in columns else [])
@@ -251,6 +262,7 @@ def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
 
             for _, detail in harness_group.iterrows():
                 detail_severity = str(detail.get("Závažnost", ""))
+                _add_detail_source_link(ws.cell(row_idx, 1), detail)
                 for col_idx, col in enumerate(columns, start=2):
                     value = "" if col == "Závažnost" else detail.get(col, "")
                     ws.cell(row_idx, col_idx, value)
@@ -268,6 +280,22 @@ def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
     _apply_readable_widths(ws)
     if ws.max_row > 1:
         ws.auto_filter.ref = f"A1:{get_column_letter(ws.max_column)}1"
+
+
+def _add_detail_source_link(cell, detail: pd.Series) -> None:
+    source_file = str(detail.get("__source_file") or "").strip()
+    source_sheet = str(detail.get("__source_sheet") or "").strip()
+    source_row = detail.get("__source_row") or 1
+    if not source_file or not source_sheet:
+        return
+    try:
+        source_uri = Path(source_file).resolve().as_uri()
+    except ValueError:
+        return
+    sheet_ref = quote(source_sheet, safe="")
+    cell.value = "Otevřít chybu"
+    cell.hyperlink = f"{source_uri}#'{sheet_ref}'!A{int(source_row)}"
+    cell.style = "Hyperlink"
 
 
 def _style_summary_row(ws, row_idx: int, max_col: int, fill: PatternFill, font: Font) -> None:

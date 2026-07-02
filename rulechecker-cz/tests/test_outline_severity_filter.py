@@ -8,7 +8,7 @@ from excel_parser import IssueRecord
 from formatter import write_output_excel
 
 
-def _record(severity_cz: str, severity_en: str, identifier: str) -> IssueRecord:
+def _record(severity_cz: str, severity_en: str, identifier: str, source_file: str = "") -> IssueRecord:
     return IssueRecord(
         rc=3002,
         severity_cz=severity_cz,
@@ -27,6 +27,10 @@ def _record(severity_cz: str, severity_en: str, identifier: str) -> IssueRecord:
         recommendation_cz="",
         recommendation_en="",
         harness_name="TAB019708C_LTGS_KSK_RL",
+        source_file=source_file,
+        source_sheet="1_LIN-Bus_Leitungsvorgabe",
+        source_row=12,
+        history_excel="[Historie](file:///C:/temp/history.xlsx)",
     )
 
 
@@ -37,8 +41,8 @@ class TestOutlineSeverityFilter(unittest.TestCase):
             write_output_excel(
                 out_path,
                 [
-                    _record("Kritické", "Critical", "A"),
-                    _record("Nekritické", "Non-critical", "B"),
+                    _record("Kritické", "Critical", "A", str(out_path)),
+                    _record("Nekritické", "Non-critical", "B", str(out_path)),
                 ],
             )
 
@@ -57,6 +61,12 @@ class TestOutlineSeverityFilter(unittest.TestCase):
             harness_col = header.index("Název svazku") + 1
             self.assertIsNone(ws.cell(first_harness_row, 1).value)
             self.assertEqual(ws.cell(first_harness_row, harness_col).value, "TAB019708C_LTGS_KSK_RL")
+
+            first_detail_row = 4
+            history_col = header.index("HISTORY_EXCEL") + 1
+            self.assertEqual(ws.cell(first_detail_row, 1).value, "Otevřít chybu")
+            self.assertIsNotNone(ws.cell(first_detail_row, 1).hyperlink)
+            self.assertIsNotNone(ws.cell(first_detail_row, history_col).hyperlink)
 
 
 if __name__ == "__main__":
