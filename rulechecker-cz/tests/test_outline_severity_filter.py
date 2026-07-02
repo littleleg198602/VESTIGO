@@ -48,8 +48,15 @@ class TestOutlineSeverityFilter(unittest.TestCase):
             rc_summary_rows = [row for row in range(2, ws.max_row + 1) if ws.row_dimensions[row].outlineLevel == 0]
             severities = [ws.cell(row, severity_col).value for row in rc_summary_rows]
 
+            self.assertEqual(header[0], "RC chyba")
+            self.assertNotIn("Počet záznamů", header)
             self.assertEqual(severities, ["Kritické", "Nekritické"])
             self.assertNotIn("Mix", severities)
+
+            first_harness_row = 3
+            harness_col = header.index("Název svazku") + 1
+            self.assertIsNone(ws.cell(first_harness_row, 1).value)
+            self.assertEqual(ws.cell(first_harness_row, harness_col).value, "TAB019708C_LTGS_KSK_RL")
 
 
 if __name__ == "__main__":
