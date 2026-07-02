@@ -22,6 +22,7 @@ OUTPUT_PATTERN_HINTS = [
     "__prehled_cz_en.xlsx",
     "__prehled_cz_en__",
     "__overview",
+    "prehled_chyb_rc_svazek_rozklik_v2",
 ]
 
 HEADER_STATUS_NAME = "Einschätzung"

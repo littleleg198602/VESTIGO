@@ -41,6 +41,14 @@ class TestMessageValueTranslation(unittest.TestCase):
         self.assertIn("Connector has no ground wire.", en)
         self.assertIn("LIN bus participants are connected to different ground points.", en)
 
+    def test_translates_wire_part_number_allowed_range_message(self):
+        source = "Die Teilenummer der Leitung gehört nicht zum erlaubten Nummernkreis."
+
+        self.assertEqual(
+            translate_value("Meldung", source, "cz"),
+            "Číslo dílu drátu nepatří do povoleného rozsahu čísel.",
+        )
+
 
     def test_translates_sheet_metadata_text(self):
         name = "Splice: Überprüfung der Bündellänge am Splice"
