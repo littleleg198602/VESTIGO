@@ -20,7 +20,7 @@ LOG = logging.getLogger("rulechecker")
 
 
 def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
-    files = sorted(input_dir.glob("*.xlsx"))
+    files = _discover_input_workbooks(input_dir)
     all_records = []
     processed_inputs: list[Path] = []
     history_map = build_history_map(input_dir / "HISTORY")
@@ -50,13 +50,31 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
     return 1, [out_path]
 
 
+def _discover_input_workbooks(input_dir: Path) -> list[Path]:
+    files: list[Path] = []
+    for file in input_dir.rglob("*.xlsx"):
+        if not file.is_file():
+            continue
+        if file.name.startswith("~$"):
+            continue
+        if is_generated_output_file(file):
+            LOG.info("Přeskakuji vygenerovaný výstup: %s", file.name)
+            continue
+        relative_parts = {part.lower() for part in file.relative_to(input_dir).parts[:-1]}
+        if relative_parts & {"bom", "history"}:
+            LOG.info("Přeskakuji pomocný soubor mimo RuleChecker vstup: %s", file)
+            continue
+        files.append(file)
+    return sorted(files)
+
+
 def _load_kurzname_map(input_dir: Path) -> dict[str, str]:
     mapping: dict[str, str] = {}
     bom_candidates = list(input_dir.glob("*BOM*.xlsx"))
     bom_dir = input_dir / "BOM"
     if bom_dir.exists():
-        bom_candidates.extend(sorted(bom_dir.glob("*BOM*.xlsx")))
-        bom_candidates.extend(sorted(bom_dir.glob("*BOM*.csv")))
+        bom_candidates.extend(sorted(bom_dir.rglob("*BOM*.xlsx")))
+        bom_candidates.extend(sorted(bom_dir.rglob("*BOM*.csv")))
 
     for bom_file in sorted(bom_candidates):
         if bom_file.suffix.lower() == ".csv":
@@ -72,36 +90,39 @@ def _load_kurzname_map(input_dir: Path) -> dict[str, str]:
             except Exception:
                 continue
             header_row = None
-            vobes_col = None
+            key_cols: list[int] = []
             kurz_col = None
             for ridx in range(min(20, len(df.index))):
+                row_key_cols: list[int] = []
+                row_kurz_col = None
                 row = [str(v).strip().lower() for v in df.iloc[ridx].tolist()]
                 for cidx, val in enumerate(row):
-                    if "vobes" in val:
-                        vobes_col = cidx
+                    if _is_kurzname_key_header(val):
+                        row_key_cols.append(cidx)
                     if "kurzname" in val:
-                        kurz_col = cidx
-                if vobes_col is not None and kurz_col is not None:
+                        row_kurz_col = cidx
+                if row_key_cols and row_kurz_col is not None:
                     header_row = ridx
+                    key_cols = row_key_cols
+                    kurz_col = row_kurz_col
                     break
-            if header_row is None or vobes_col is None or kurz_col is None:
+            if header_row is None or not key_cols or kurz_col is None:
                 # Fallback pro čitelné BOM XLSX se známým layoutem:
                 # VOBES bývá ve sloupci B, Kurzname ve sloupci E.
                 if len(df.columns) >= 5:
                     header_row = 2
-                    vobes_col = 1
+                    key_cols = [1]
                     kurz_col = 4
                 else:
                     continue
             for _, row in df.iloc[header_row + 1 :].iterrows():
-                vobes = str(row.iloc[vobes_col] if vobes_col < len(row) else "").strip()
                 kurz = str(row.iloc[kurz_col] if kurz_col < len(row) else "").strip()
-                if not vobes or not kurz or vobes.lower() == "nan" or kurz.lower() == "nan":
+                if not kurz or kurz.lower() == "nan":
                     continue
-                mapping[vobes] = kurz
-                norm = _normalize_vobes(vobes)
-                if norm:
-                    mapping[norm] = kurz
+                for key_col in key_cols:
+                    if key_col >= len(row):
+                        continue
+                    _add_kurzname_mapping(mapping, row.iloc[key_col], kurz)
     return mapping
 
 
@@ -115,31 +136,62 @@ def _load_kurzname_from_csv(path: Path, mapping: dict[str, str]) -> None:
             return
 
     header_row = None
-    vobes_col = None
+    key_cols: list[int] = []
     kurz_col = None
     for ridx in range(min(20, len(df.index))):
+        row_key_cols: list[int] = []
+        row_kurz_col = None
         row = [str(v).strip().lower() for v in df.iloc[ridx].tolist()]
         for cidx, val in enumerate(row):
-            if "vobes" in val:
-                vobes_col = cidx
+            if _is_kurzname_key_header(val):
+                row_key_cols.append(cidx)
             if "kurzname" in val:
-                kurz_col = cidx
-        if vobes_col is not None and kurz_col is not None:
+                row_kurz_col = cidx
+        if row_key_cols and row_kurz_col is not None:
             header_row = ridx
+            key_cols = row_key_cols
+            kurz_col = row_kurz_col
             break
 
-    if header_row is None or vobes_col is None or kurz_col is None:
+    if header_row is None or not key_cols or kurz_col is None:
         return
 
     for _, row in df.iloc[header_row + 1 :].iterrows():
-        vobes = str(row.iloc[vobes_col] if vobes_col < len(row) else "").strip()
         kurz = str(row.iloc[kurz_col] if kurz_col < len(row) else "").strip()
-        if not vobes or not kurz or vobes.lower() == "nan" or kurz.lower() == "nan":
+        if not kurz or kurz.lower() == "nan":
             continue
-        mapping[vobes] = kurz
-        norm = _normalize_vobes(vobes)
-        if norm:
-            mapping[norm] = kurz
+        for key_col in key_cols:
+            if key_col >= len(row):
+                continue
+            _add_kurzname_mapping(mapping, row.iloc[key_col], kurz)
+
+
+def _is_kurzname_key_header(header: str) -> bool:
+    normalized = str(header).strip().lower()
+    return any(
+        token in normalized
+        for token in {
+            "vobes",
+            "bauteil",
+            "komponente",
+            "connector",
+            "stecker",
+            "leitungsnummer",
+            "leitung",
+            "pin",
+            "kammer",
+        }
+    )
+
+
+def _add_kurzname_mapping(mapping: dict[str, str], key: object, kurz: str) -> None:
+    text = str(key).strip()
+    if not text or text.lower() == "nan":
+        return
+    mapping[text] = kurz
+    norm = _normalize_vobes(text)
+    if norm:
+        mapping[norm] = kurz
 
 
 def _normalize_vobes(value: str) -> str:
@@ -157,7 +209,17 @@ def _resolve_kurzname(mapping: dict[str, str], identifier: str) -> str:
     if raw in mapping:
         return mapping[raw]
     norm = _normalize_vobes(raw)
-    return mapping.get(norm, "")
+    if norm in mapping:
+        return mapping[norm]
+    matches = []
+    for part in re.split(r"[\s,;_/]+", raw):
+        value = part.strip()
+        if not value:
+            continue
+        match = mapping.get(value) or mapping.get(_normalize_vobes(value))
+        if match and match not in matches:
+            matches.append(match)
+    return ", ".join(matches)
 
 
 

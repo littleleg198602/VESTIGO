@@ -95,6 +95,10 @@ MESSAGE_VALUE_REPLACEMENTS = {
         "Konektor nemá zemnicí vedení.",
         "Connector has no ground wire.",
     ),
+    "die teilenummer der leitung gehört nicht zum erlaubten nummernkreis.": (
+        "Číslo dílu drátu nepatří do povoleného rozsahu čísel.",
+        "The wire part number does not belong to the allowed number range.",
+    ),
 }
 
 
