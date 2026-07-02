@@ -194,7 +194,9 @@ def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
     ws = wb.create_sheet("CZ_RC_Svazek", 0)
     df = _sort_cz_dataframe(cz_df)
     columns = list(df.columns)
-    ws.append(columns)
+    detail_severity_col_name = "Závažnost detailu"
+    outline_columns = columns + ([detail_severity_col_name] if "Závažnost" in columns else [])
+    ws.append(outline_columns)
     for cell in ws[1]:
         cell.fill = HEADER_FILL
         cell.font = HEADER_FONT
@@ -205,8 +207,9 @@ def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
     ws.sheet_properties.outlinePr.summaryBelow = False
     ws.sheet_properties.outlinePr.summaryRight = False
 
-    harness_col = columns.index("Název svazku") + 1 if "Název svazku" in columns else None
-    severity_col = columns.index("Závažnost") + 1 if "Závažnost" in columns else None
+    harness_col = outline_columns.index("Název svazku") + 1 if "Název svazku" in outline_columns else None
+    severity_col = outline_columns.index("Závažnost") + 1 if "Závažnost" in outline_columns else None
+    detail_severity_col = outline_columns.index(detail_severity_col_name) + 1 if detail_severity_col_name in outline_columns else None
 
     row_idx = 2
     group_cols = ["RC", "Název chyby"] if "Název chyby" in columns else ["RC"]
@@ -217,11 +220,11 @@ def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
         severities = sorted({str(v) for v in rc_group.get("Závažnost", pd.Series(dtype=str)).dropna().unique() if str(v).strip()})
         severity_text = severities[0] if len(severities) == 1 else "Mix" if severities else ""
         ws.cell(row_idx, 1, f"RC {rc_value} – {title_value}".strip(" –"))
-        if len(columns) > 1:
+        if len(outline_columns) > 1:
             ws.cell(row_idx, 2, f"Celkem záznamů: {len(rc_group)}")
         if severity_col:
             ws.cell(row_idx, severity_col, severity_text)
-        _style_summary_row(ws, row_idx, len(columns), HEADER_FILL, HEADER_FONT)
+        _style_summary_row(ws, row_idx, len(outline_columns), HEADER_FILL, HEADER_FONT)
         ws.row_dimensions[row_idx].collapsed = True
         row_idx += 1
 
@@ -233,17 +236,20 @@ def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
             if severity_col:
                 hs = sorted({str(v) for v in harness_group.get("Závažnost", pd.Series(dtype=str)).dropna().unique() if str(v).strip()})
                 ws.cell(row_idx, severity_col, hs[0] if len(hs) == 1 else "Mix" if hs else "")
-            _style_summary_row(ws, row_idx, len(columns), PatternFill("solid", fgColor="D9EAD3"), Font(bold=True, color="1F1F1F"))
+            _style_summary_row(ws, row_idx, len(outline_columns), PatternFill("solid", fgColor="D9EAD3"), Font(bold=True, color="1F1F1F"))
             ws.row_dimensions[row_idx].outlineLevel = 1
             ws.row_dimensions[row_idx].hidden = True
             ws.row_dimensions[row_idx].collapsed = True
             row_idx += 1
 
             for _, detail in harness_group.iterrows():
+                detail_severity = str(detail.get("Závažnost", ""))
                 for col_idx, col in enumerate(columns, start=1):
-                    ws.cell(row_idx, col_idx, detail.get(col, ""))
-                severity = str(detail.get("Závažnost", ""))
-                fill = _pick_fill(severity, row_idx)
+                    value = "" if col == "Závažnost" else detail.get(col, "")
+                    ws.cell(row_idx, col_idx, value)
+                if detail_severity_col:
+                    ws.cell(row_idx, detail_severity_col, detail_severity)
+                fill = _pick_fill(detail_severity, row_idx)
                 for cell in ws[row_idx]:
                     cell.fill = fill
                     cell.border = ROW_BORDER
@@ -289,6 +295,7 @@ def _write_help_sheet(wb) -> None:
         ["1. Na listu CZ_RC_Svazek klikni na plus vlevo u RC chyby."],
         ["2. Potom klikni na plus u názvu svazku."],
         ["3. Zobrazí se konkrétní konektory / objekty včetně Solution, Notes a historie."],
+        ["4. Filtr ve sloupci Závažnost je určený pro souhrnné řádky; detailní řádky mají původní hodnotu ve sloupci Závažnost detailu, aby je filtr Kritické/Nekritické zbytečně nevytahoval."],
     ]
     for row in rows:
         ws.append(row)
@@ -301,7 +308,7 @@ def _apply_readable_widths(ws) -> None:
     preferred = {
         "Název svazku": 28, "RC": 12, "Typ objektu": 18, "Identifikátor": 26, "Kurzname": 20,
         "Název chyby": 34, "Vysvětlení": 48, "Doporučení": 52, "Solution": 34, "Notes": 34,
-        "HISTORY_EXCEL": 42, "HISTORY_MAIL": 42,
+        "HISTORY_EXCEL": 42, "HISTORY_MAIL": 42, "Závažnost detailu": 18,
     }
     for idx, cell in enumerate(ws[1], start=1):
         header = str(cell.value or "")

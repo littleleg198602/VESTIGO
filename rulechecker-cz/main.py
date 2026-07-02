@@ -20,7 +20,7 @@ LOG = logging.getLogger("rulechecker")
 
 
 def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
-    files = sorted(input_dir.glob("*.xlsx"))
+    files = _discover_input_workbooks(input_dir)
     all_records = []
     processed_inputs: list[Path] = []
     history_map = build_history_map(input_dir / "HISTORY")
@@ -48,6 +48,24 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
     write_output_excel(out_path, all_records)
     LOG.info("Vytvořen výstup: %s (záznamů: %d, vstupních souborů: %d)", out_path.name, len(all_records), len(processed_inputs))
     return 1, [out_path]
+
+
+def _discover_input_workbooks(input_dir: Path) -> list[Path]:
+    files: list[Path] = []
+    for file in input_dir.rglob("*.xlsx"):
+        if not file.is_file():
+            continue
+        if file.name.startswith("~$"):
+            continue
+        if is_generated_output_file(file):
+            LOG.info("Přeskakuji vygenerovaný výstup: %s", file.name)
+            continue
+        relative_parts = {part.lower() for part in file.relative_to(input_dir).parts[:-1]}
+        if relative_parts & {"bom", "history"}:
+            LOG.info("Přeskakuji pomocný soubor mimo RuleChecker vstup: %s", file)
+            continue
+        files.append(file)
+    return sorted(files)
 
 
 def _load_kurzname_map(input_dir: Path) -> dict[str, str]:
