@@ -217,14 +217,22 @@ def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
     detail_severity_col = outline_columns.index(detail_severity_col_name) + 1 if detail_severity_col_name in outline_columns else None
 
     row_idx = 2
-    group_cols = ["RC", "Název chyby"] if "Název chyby" in columns else ["RC"]
+    group_cols = ["RC"]
+    if "Název chyby" in columns:
+        group_cols.append("Název chyby")
+    if "Závažnost" in columns:
+        group_cols.append("Závažnost")
     for group_key, rc_group in df.groupby(group_cols, dropna=False, sort=False):
         if not isinstance(group_key, tuple):
             group_key = (group_key, "")
-        rc_value, title_value = group_key[0], group_key[1] if len(group_key) > 1 else ""
-        severities = sorted({str(v) for v in rc_group.get("Závažnost", pd.Series(dtype=str)).dropna().unique() if str(v).strip()})
-        severity_text = severities[0] if len(severities) == 1 else "Mix" if severities else ""
-        ws.cell(row_idx, 1, f"RC {rc_value} – {title_value}".strip(" –"))
+        rc_value = group_key[0]
+        title_value = group_key[1] if "Název chyby" in columns and len(group_key) > 1 else ""
+        severity_text = group_key[-1] if "Závažnost" in columns and len(group_key) > 1 else ""
+        severity_text = "" if pd.isna(severity_text) else str(severity_text)
+        rc_label = f"RC {rc_value} – {title_value}".strip(" –")
+        if severity_text:
+            rc_label = f"{rc_label} – {severity_text}"
+        ws.cell(row_idx, 1, rc_label)
         ws.cell(row_idx, 2, len(rc_group))
         if severity_col:
             ws.cell(row_idx, severity_col, severity_text)
@@ -239,8 +247,7 @@ def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
             if harness_col:
                 ws.cell(row_idx, harness_col, harness)
             if severity_col:
-                hs = sorted({str(v) for v in harness_group.get("Závažnost", pd.Series(dtype=str)).dropna().unique() if str(v).strip()})
-                ws.cell(row_idx, severity_col, hs[0] if len(hs) == 1 else "Mix" if hs else "")
+                ws.cell(row_idx, severity_col, severity_text)
             _style_summary_row(ws, row_idx, len(outline_columns), PatternFill("solid", fgColor="D9EAD3"), Font(bold=True, color="1F1F1F"))
             ws.row_dimensions[row_idx].outlineLevel = 1
             ws.row_dimensions[row_idx].hidden = True
