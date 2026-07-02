@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import logging
 from pathlib import Path
 import re
@@ -133,10 +134,12 @@ def _convert_bom_csv_files_to_xlsx(bom_dir: Path) -> list[Path]:
             continue
         df = _read_semicolon_csv(csv_path)
         if df is None:
+            LOG.warning("BOM CSV se nepodařilo převést na XLSX: %s", csv_path)
             continue
         try:
             df.to_excel(xlsx_path, index=False, header=False, engine="openpyxl")
-        except Exception:
+        except Exception as exc:
+            LOG.warning("BOM CSV se nepodařilo uložit jako XLSX %s: %s", xlsx_path, exc)
             continue
         converted.append(xlsx_path)
     return converted
@@ -145,7 +148,18 @@ def _convert_bom_csv_files_to_xlsx(bom_dir: Path) -> list[Path]:
 def _read_semicolon_csv(path: Path) -> pd.DataFrame | None:
     for encoding in ("utf-8-sig", "utf-8", "cp1250", "latin-1"):
         try:
-            return pd.read_csv(path, sep=";", header=None, dtype=str, encoding=encoding)
+            with path.open("r", encoding=encoding, newline="") as handle:
+                rows = list(csv.reader(handle, delimiter=";"))
+        except Exception:
+            continue
+        if not rows:
+            return pd.DataFrame()
+        max_len = max(len(row) for row in rows)
+        normalized_rows = [row + [""] * (max_len - len(row)) for row in rows]
+        return pd.DataFrame(normalized_rows, dtype=str)
+    for encoding in ("utf-8-sig", "utf-8", "cp1250", "latin-1"):
+        try:
+            return pd.read_csv(path, sep=";", header=None, dtype=str, encoding=encoding, engine="python", on_bad_lines="warn")
         except Exception:
             continue
     return None
