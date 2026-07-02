@@ -18,8 +18,24 @@ class TestBomKurzname(unittest.TestCase):
 
             mapping = _load_kurzname_map(root)
 
+            self.assertTrue((bom / "AEM_TAB019708C_0335.BOM.xlsx").exists())
             self.assertEqual(_resolve_kurzname(mapping, "XA.VX57.4"), "CONN_A")
             self.assertEqual(_resolve_kurzname(mapping, "XA.GX1.1_XA.GX1.2"), "CONN_B, CONN_C")
+
+    def test_converts_and_reads_any_semicolon_csv_in_bom_folder(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bom = root / "BOM"
+            bom.mkdir()
+            (bom / "AEM_TAB019708C_0335.Wirelist.csv").write_text(
+                "Bauteil;Kurzname\nXA.G483.1;CONN_WIRELIST\n",
+                encoding="utf-8",
+            )
+
+            mapping = _load_kurzname_map(root)
+
+            self.assertTrue((bom / "AEM_TAB019708C_0335.Wirelist.xlsx").exists())
+            self.assertEqual(_resolve_kurzname(mapping, "XA.G483.1"), "CONN_WIRELIST")
 
 
 if __name__ == "__main__":

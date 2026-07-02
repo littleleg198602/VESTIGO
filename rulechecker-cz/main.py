@@ -73,13 +73,11 @@ def _load_kurzname_map(input_dir: Path) -> dict[str, str]:
     bom_candidates = list(input_dir.glob("*BOM*.xlsx"))
     bom_dir = input_dir / "BOM"
     if bom_dir.exists():
-        bom_candidates.extend(sorted(bom_dir.rglob("*BOM*.xlsx")))
-        bom_candidates.extend(sorted(bom_dir.rglob("*BOM*.csv")))
+        converted = _convert_bom_csv_files_to_xlsx(bom_dir)
+        bom_candidates.extend(converted)
+        bom_candidates.extend(sorted(bom_dir.rglob("*.xlsx")))
 
-    for bom_file in sorted(bom_candidates):
-        if bom_file.suffix.lower() == ".csv":
-            _load_kurzname_from_csv(bom_file, mapping)
-            continue
+    for bom_file in sorted(set(bom_candidates)):
         try:
             xls = pd.ExcelFile(bom_file, engine="openpyxl")
         except Exception:
@@ -126,44 +124,31 @@ def _load_kurzname_map(input_dir: Path) -> dict[str, str]:
     return mapping
 
 
-def _load_kurzname_from_csv(path: Path, mapping: dict[str, str]) -> None:
-    try:
-        df = pd.read_csv(path, sep=None, engine="python", header=None, dtype=str, encoding="utf-8")
-    except Exception:
-        try:
-            df = pd.read_csv(path, sep=";", header=None, dtype=str, encoding="latin-1")
-        except Exception:
-            return
-
-    header_row = None
-    key_cols: list[int] = []
-    kurz_col = None
-    for ridx in range(min(20, len(df.index))):
-        row_key_cols: list[int] = []
-        row_kurz_col = None
-        row = [str(v).strip().lower() for v in df.iloc[ridx].tolist()]
-        for cidx, val in enumerate(row):
-            if _is_kurzname_key_header(val):
-                row_key_cols.append(cidx)
-            if "kurzname" in val:
-                row_kurz_col = cidx
-        if row_key_cols and row_kurz_col is not None:
-            header_row = ridx
-            key_cols = row_key_cols
-            kurz_col = row_kurz_col
-            break
-
-    if header_row is None or not key_cols or kurz_col is None:
-        return
-
-    for _, row in df.iloc[header_row + 1 :].iterrows():
-        kurz = str(row.iloc[kurz_col] if kurz_col < len(row) else "").strip()
-        if not kurz or kurz.lower() == "nan":
+def _convert_bom_csv_files_to_xlsx(bom_dir: Path) -> list[Path]:
+    converted: list[Path] = []
+    for csv_path in sorted(bom_dir.rglob("*.csv")):
+        xlsx_path = csv_path.with_suffix(".xlsx")
+        if xlsx_path.exists() and xlsx_path.stat().st_mtime >= csv_path.stat().st_mtime:
+            converted.append(xlsx_path)
             continue
-        for key_col in key_cols:
-            if key_col >= len(row):
-                continue
-            _add_kurzname_mapping(mapping, row.iloc[key_col], kurz)
+        df = _read_semicolon_csv(csv_path)
+        if df is None:
+            continue
+        try:
+            df.to_excel(xlsx_path, index=False, header=False, engine="openpyxl")
+        except Exception:
+            continue
+        converted.append(xlsx_path)
+    return converted
+
+
+def _read_semicolon_csv(path: Path) -> pd.DataFrame | None:
+    for encoding in ("utf-8-sig", "utf-8", "cp1250", "latin-1"):
+        try:
+            return pd.read_csv(path, sep=";", header=None, dtype=str, encoding=encoding)
+        except Exception:
+            continue
+    return None
 
 
 def _is_kurzname_key_header(header: str) -> bool:
