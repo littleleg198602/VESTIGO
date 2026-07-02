@@ -181,6 +181,9 @@ def _parse_rc121_grouped(
             f"Required colors = {', '.join(color_soll) or '-'}; "
             f"Potentials = {', '.join(potentials) or '-'}"
         )
+        messages = _unique_values(group, ["Meldung"])
+        recommendation_cz = "; ".join(translate_value("Meldung", msg, "cz") for msg in messages)
+        recommendation_en = "; ".join(translate_value("Meldung", msg, "en") for msg in messages)
 
         identifier = ", ".join(wires) if wires else (splice_name or vobes_value or "-")
         out.append(
@@ -200,8 +203,8 @@ def _parse_rc121_grouped(
                 affected_en=f"Splice {splice_name}".strip(),
                 where_cz=where_cz,
                 where_en=where_en,
-                recommendation_cz=defn.recommendation_cz,
-                recommendation_en=defn.recommendation_en,
+                recommendation_cz=recommendation_cz,
+                recommendation_en=recommendation_en,
                 source_file=source_file,
                 source_sheet=source_sheet,
                 source_row=_resolve_source_row(df, first_group_idx),
@@ -239,6 +242,9 @@ def _build_record_from_row(
         where_en = _compose_from_columns(row, defn.issue_columns, "en")
 
     wire_number = _extract_wire_number(row)
+    message = _first_non_empty_value(row, ["Meldung"])
+    recommendation_cz = translate_value("Meldung", message, "cz")
+    recommendation_en = translate_value("Meldung", message, "en")
 
     return IssueRecord(
         rc=rc,
@@ -256,8 +262,8 @@ def _build_record_from_row(
         affected_en=affected_en,
         where_cz=where_cz,
         where_en=where_en,
-        recommendation_cz=defn.recommendation_cz,
-        recommendation_en=defn.recommendation_en,
+        recommendation_cz=recommendation_cz,
+        recommendation_en=recommendation_en,
         source_file=source_file,
         source_sheet=source_sheet,
         source_row=source_row,

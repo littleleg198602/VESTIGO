@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from config import (
@@ -27,6 +28,7 @@ CZ_COLUMNS = [
     "Priority",
     "Progress",
     "Solution",
+    "Notes",
     "HISTORY_EXCEL",
     "HISTORY_MAIL",
 ]
@@ -43,6 +45,7 @@ EN_COLUMNS = [
     "Priority",
     "Progress",
     "Solution",
+    "Notes",
     "HISTORY_EXCEL",
     "HISTORY_MAIL",
 ]
@@ -101,10 +104,11 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Kurzname": r.kurzname,
             "Název chyby": r.title_cz,
             "Vysvětlení": r.explanation_cz,
-            "Doporučení": _compose_recommendation(r.affected_cz, r.where_cz, r.recommendation_cz),
+            "Doporučení": r.recommendation_cz,
             "Priority": _legacy_priority(r.severity_en),
             "Progress": _default_progress(r.severity_en),
             "Solution": "",
+            "Notes": "",
             "HISTORY_EXCEL": r.history_excel,
             "HISTORY_MAIL": r.history_mail,
         }
@@ -120,10 +124,11 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Kurzname": r.kurzname,
             "Error title": r.title_en,
             "Explanation": r.explanation_en,
-            "Recommendation": _compose_recommendation(r.affected_en, r.where_en, r.recommendation_en),
+            "Recommendation": r.recommendation_en,
             "Priority": _legacy_priority(r.severity_en),
             "Progress": _default_progress(r.severity_en),
             "Solution": "",
+            "Notes": "",
             "HISTORY_EXCEL": r.history_excel,
             "HISTORY_MAIL": r.history_mail,
         }
@@ -154,6 +159,12 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
         for sheet, df in frames.items():
             df.to_excel(writer, sheet_name=sheet, index=False)
 
+        cz_df = frames[OUTPUT_SHEET_CZ].copy()
+        cz_df.to_excel(writer, sheet_name="CZ_Data", index=False)
+        _write_rc_harness_outline_sheet(writer.book, cz_df, records_by_sheet.get(OUTPUT_SHEET_CZ, []))
+        _write_rc_summary_sheet(writer.book, cz_df)
+        _write_help_sheet(writer.book)
+
         for sheet in frames:
             ws = writer.book[sheet]
             _add_rc_hyperlinks(ws, records_by_sheet.get(sheet, []))
@@ -163,6 +174,181 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
             _add_priority_validation(ws)
             _add_progress_validation(ws)
 
+        cz_data_ws = writer.book["CZ_Data"]
+        _add_rc_hyperlinks(cz_data_ws, records_by_sheet.get(OUTPUT_SHEET_CZ, []))
+        _add_history_hyperlinks(cz_data_ws, "HISTORY_EXCEL")
+        _add_history_hyperlinks(cz_data_ws, "HISTORY_MAIL")
+        _format_sheet(cz_data_ws, "CZ_Data")
+        _add_priority_validation(cz_data_ws)
+        _add_progress_validation(cz_data_ws)
+
+        outline_ws = writer.book["CZ_RC_Svazek"]
+        _add_history_hyperlinks(outline_ws, "HISTORY_EXCEL")
+        _add_history_hyperlinks(outline_ws, "HISTORY_MAIL")
+
+
+
+def _sort_cz_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    sort_cols = [col for col in ["RC", "Název chyby", "Název svazku", "Typ objektu", "Identifikátor"] if col in df.columns]
+    if not sort_cols:
+        return df.copy()
+    work = df.copy()
+    work["__rc_sort"] = pd.to_numeric(work.get("RC"), errors="coerce") if "RC" in work.columns else 0
+    by = ["__rc_sort"] + [col for col in sort_cols if col != "RC"]
+    return work.sort_values(by=by, kind="mergesort", na_position="last").drop(columns=["__rc_sort"])
+
+
+def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame, records: list[IssueRecord]) -> None:
+    ws = wb.create_sheet("CZ_RC_Svazek", 0)
+    source_df = cz_df.copy()
+    padded_records = records[: len(source_df)]
+    missing_count = len(source_df) - len(padded_records)
+    source_df["__source_file"] = [record.source_file for record in padded_records] + [""] * missing_count
+    source_df["__source_sheet"] = [record.source_sheet for record in padded_records] + [""] * missing_count
+    source_df["__source_row"] = [record.source_row for record in padded_records] + [1] * missing_count
+    df = _sort_cz_dataframe(source_df)
+    source_columns = {"__source_file", "__source_sheet", "__source_row"}
+    columns = [col for col in df.columns if col not in source_columns]
+    detail_severity_col_name = "Závažnost detailu"
+    outline_label_col_name = "RC chyba"
+    outline_columns = [outline_label_col_name] + columns + ([detail_severity_col_name] if "Závažnost" in columns else [])
+    ws.append(outline_columns)
+    for cell in ws[1]:
+        cell.fill = HEADER_FILL
+        cell.font = HEADER_FONT
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = ROW_BORDER
+
+    ws.freeze_panes = "A2"
+    ws.sheet_properties.outlinePr.summaryBelow = False
+    ws.sheet_properties.outlinePr.summaryRight = False
+
+    harness_col = outline_columns.index("Název svazku") + 1 if "Název svazku" in outline_columns else None
+    severity_col = outline_columns.index("Závažnost") + 1 if "Závažnost" in outline_columns else None
+    detail_severity_col = outline_columns.index(detail_severity_col_name) + 1 if detail_severity_col_name in outline_columns else None
+
+    row_idx = 2
+    group_cols = ["RC"]
+    if "Název chyby" in columns:
+        group_cols.append("Název chyby")
+    if "Závažnost" in columns:
+        group_cols.append("Závažnost")
+    for group_key, rc_group in df.groupby(group_cols, dropna=False, sort=False):
+        if not isinstance(group_key, tuple):
+            group_key = (group_key, "")
+        rc_value = group_key[0]
+        title_value = group_key[1] if "Název chyby" in columns and len(group_key) > 1 else ""
+        severity_text = group_key[-1] if "Závažnost" in columns and len(group_key) > 1 else ""
+        severity_text = "" if pd.isna(severity_text) else str(severity_text)
+        rc_label = f"RC {rc_value} – {title_value}".strip(" –")
+        ws.cell(row_idx, 1, rc_label)
+        if severity_col:
+            ws.cell(row_idx, severity_col, severity_text)
+        _style_summary_row(ws, row_idx, len(outline_columns), HEADER_FILL, HEADER_FONT)
+        ws.row_dimensions[row_idx].collapsed = True
+        row_idx += 1
+
+        harness_groups = rc_group.groupby("Název svazku", dropna=False, sort=False) if "Název svazku" in columns else [("", rc_group)]
+        for harness, harness_group in harness_groups:
+            if harness_col:
+                ws.cell(row_idx, harness_col, harness)
+            if severity_col:
+                ws.cell(row_idx, severity_col, severity_text)
+            _style_summary_row(ws, row_idx, len(outline_columns), PatternFill("solid", fgColor="D9EAD3"), Font(bold=True, color="1F1F1F"))
+            ws.row_dimensions[row_idx].outlineLevel = 1
+            ws.row_dimensions[row_idx].hidden = True
+            ws.row_dimensions[row_idx].collapsed = True
+            row_idx += 1
+
+            for _, detail in harness_group.iterrows():
+                detail_severity = str(detail.get("Závažnost", ""))
+                _add_detail_source_link(ws.cell(row_idx, 1), detail)
+                for col_idx, col in enumerate(columns, start=2):
+                    value = "" if col == "Závažnost" else detail.get(col, "")
+                    ws.cell(row_idx, col_idx, value)
+                if detail_severity_col:
+                    ws.cell(row_idx, detail_severity_col, detail_severity)
+                fill = _pick_fill(detail_severity, row_idx)
+                for cell in ws[row_idx]:
+                    cell.fill = fill
+                    cell.border = ROW_BORDER
+                    cell.alignment = Alignment(vertical="top", wrap_text=True)
+                ws.row_dimensions[row_idx].outlineLevel = 2
+                ws.row_dimensions[row_idx].hidden = True
+                row_idx += 1
+
+    _apply_readable_widths(ws)
+    if ws.max_row > 1:
+        ws.auto_filter.ref = f"A1:{get_column_letter(ws.max_column)}1"
+
+
+def _add_detail_source_link(cell, detail: pd.Series) -> None:
+    source_file = str(detail.get("__source_file") or "").strip()
+    source_sheet = str(detail.get("__source_sheet") or "").strip()
+    source_row = detail.get("__source_row") or 1
+    if not source_file or not source_sheet:
+        return
+    try:
+        source_uri = Path(source_file).resolve().as_uri()
+    except ValueError:
+        return
+    sheet_ref = quote(source_sheet, safe="")
+    cell.value = "Otevřít chybu"
+    cell.hyperlink = f"{source_uri}#'{sheet_ref}'!A{int(source_row)}"
+    cell.style = "Hyperlink"
+
+
+def _style_summary_row(ws, row_idx: int, max_col: int, fill: PatternFill, font: Font) -> None:
+    for col_idx in range(1, max_col + 1):
+        cell = ws.cell(row_idx, col_idx)
+        cell.fill = fill
+        cell.font = font
+        cell.border = ROW_BORDER
+        cell.alignment = Alignment(vertical="top", wrap_text=True)
+
+
+def _write_rc_summary_sheet(wb, cz_df: pd.DataFrame) -> None:
+    ws = wb.create_sheet("Souhrn_RC")
+    cols = [c for c in ["RC", "Název chyby"] if c in cz_df.columns]
+    if cols:
+        summary = cz_df.groupby(cols, dropna=False).size().reset_index(name="Počet výskytů")
+        if "RC" in summary.columns:
+            summary["__rc_sort"] = pd.to_numeric(summary["RC"], errors="coerce")
+            summary = summary.sort_values(["__rc_sort"] + [c for c in cols if c != "RC"], kind="mergesort", na_position="last").drop(columns=["__rc_sort"])
+    else:
+        summary = pd.DataFrame({"Počet výskytů": [len(cz_df)]})
+    ws.append(list(summary.columns))
+    for _, row in summary.iterrows():
+        ws.append(list(row))
+    _format_sheet(ws, "CZ")
+
+
+def _write_help_sheet(wb) -> None:
+    ws = wb.create_sheet("Navod")
+    rows = [
+        ["Jak používat přehled"],
+        ["1. Na listu CZ_RC_Svazek klikni na plus vlevo u RC chyby."],
+        ["2. Potom klikni na plus u názvu svazku."],
+        ["3. Zobrazí se konkrétní konektory / objekty včetně Solution, Notes a historie."],
+        ["4. Filtr ve sloupci Závažnost je určený pro souhrnné řádky; detailní řádky mají původní hodnotu ve sloupci Závažnost detailu, aby je filtr Kritické/Nekritické zbytečně nevytahoval."],
+    ]
+    for row in rows:
+        ws.append(row)
+    ws[1][0].fill = HEADER_FILL
+    ws[1][0].font = HEADER_FONT
+    ws.column_dimensions["A"].width = 90
+
+
+def _apply_readable_widths(ws) -> None:
+    preferred = {
+        "RC chyba": 34, "Název svazku": 28, "RC": 12, "Typ objektu": 18, "Identifikátor": 26, "Kurzname": 20,
+        "Název chyby": 34, "Vysvětlení": 48, "Doporučení": 52, "Solution": 34, "Notes": 34,
+        "HISTORY_EXCEL": 42, "HISTORY_MAIL": 42, "Závažnost detailu": 18,
+    }
+    for idx, cell in enumerate(ws[1], start=1):
+        header = str(cell.value or "")
+        width = preferred.get(header, min(max(len(header) + 2, 14), 60))
+        ws.column_dimensions[get_column_letter(idx)].width = width
 
 def _split_records_by_sheet(records: list[IssueRecord]) -> dict[str, list[IssueRecord]]:
     return {
