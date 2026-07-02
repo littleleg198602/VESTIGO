@@ -28,6 +28,7 @@ CZ_COLUMNS = [
     "Priority",
     "Progress",
     "Solution",
+    "Notes",
     "HISTORY_EXCEL",
     "HISTORY_MAIL",
 ]
@@ -44,6 +45,7 @@ EN_COLUMNS = [
     "Priority",
     "Progress",
     "Solution",
+    "Notes",
     "HISTORY_EXCEL",
     "HISTORY_MAIL",
 ]
@@ -102,10 +104,11 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Kurzname": r.kurzname,
             "Název chyby": r.title_cz,
             "Vysvětlení": r.explanation_cz,
-            "Doporučení": _compose_recommendation(r.affected_cz, r.where_cz, r.recommendation_cz),
+            "Doporučení": r.recommendation_cz,
             "Priority": _legacy_priority(r.severity_en),
             "Progress": _default_progress(r.severity_en),
             "Solution": "",
+            "Notes": "",
             "HISTORY_EXCEL": r.history_excel,
             "HISTORY_MAIL": r.history_mail,
         }
@@ -121,10 +124,11 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Kurzname": r.kurzname,
             "Error title": r.title_en,
             "Explanation": r.explanation_en,
-            "Recommendation": _compose_recommendation(r.affected_en, r.where_en, r.recommendation_en),
+            "Recommendation": r.recommendation_en,
             "Priority": _legacy_priority(r.severity_en),
             "Progress": _default_progress(r.severity_en),
             "Solution": "",
+            "Notes": "",
             "HISTORY_EXCEL": r.history_excel,
             "HISTORY_MAIL": r.history_mail,
         }
@@ -195,7 +199,8 @@ def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
     df = _sort_cz_dataframe(cz_df)
     columns = list(df.columns)
     detail_severity_col_name = "Závažnost detailu"
-    outline_columns = columns + ([detail_severity_col_name] if "Závažnost" in columns else [])
+    outline_label_col_name = "RC chyba / svazek"
+    outline_columns = [outline_label_col_name, "Počet záznamů"] + columns + ([detail_severity_col_name] if "Závažnost" in columns else [])
     ws.append(outline_columns)
     for cell in ws[1]:
         cell.fill = HEADER_FILL
@@ -220,8 +225,7 @@ def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
         severities = sorted({str(v) for v in rc_group.get("Závažnost", pd.Series(dtype=str)).dropna().unique() if str(v).strip()})
         severity_text = severities[0] if len(severities) == 1 else "Mix" if severities else ""
         ws.cell(row_idx, 1, f"RC {rc_value} – {title_value}".strip(" –"))
-        if len(outline_columns) > 1:
-            ws.cell(row_idx, 2, f"Celkem záznamů: {len(rc_group)}")
+        ws.cell(row_idx, 2, len(rc_group))
         if severity_col:
             ws.cell(row_idx, severity_col, severity_text)
         _style_summary_row(ws, row_idx, len(outline_columns), HEADER_FILL, HEADER_FONT)
@@ -230,7 +234,8 @@ def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
 
         harness_groups = rc_group.groupby("Název svazku", dropna=False, sort=False) if "Název svazku" in columns else [("", rc_group)]
         for harness, harness_group in harness_groups:
-            ws.cell(row_idx, 1, f"{harness} – {len(harness_group)}×")
+            ws.cell(row_idx, 1, str(harness))
+            ws.cell(row_idx, 2, len(harness_group))
             if harness_col:
                 ws.cell(row_idx, harness_col, harness)
             if severity_col:
@@ -244,7 +249,7 @@ def _write_rc_harness_outline_sheet(wb, cz_df: pd.DataFrame) -> None:
 
             for _, detail in harness_group.iterrows():
                 detail_severity = str(detail.get("Závažnost", ""))
-                for col_idx, col in enumerate(columns, start=1):
+                for col_idx, col in enumerate(columns, start=3):
                     value = "" if col == "Závažnost" else detail.get(col, "")
                     ws.cell(row_idx, col_idx, value)
                 if detail_severity_col:
@@ -306,7 +311,7 @@ def _write_help_sheet(wb) -> None:
 
 def _apply_readable_widths(ws) -> None:
     preferred = {
-        "Název svazku": 28, "RC": 12, "Typ objektu": 18, "Identifikátor": 26, "Kurzname": 20,
+        "RC chyba / svazek": 34, "Počet záznamů": 14, "Název svazku": 28, "RC": 12, "Typ objektu": 18, "Identifikátor": 26, "Kurzname": 20,
         "Název chyby": 34, "Vysvětlení": 48, "Doporučení": 52, "Solution": 34, "Notes": 34,
         "HISTORY_EXCEL": 42, "HISTORY_MAIL": 42, "Závažnost detailu": 18,
     }
