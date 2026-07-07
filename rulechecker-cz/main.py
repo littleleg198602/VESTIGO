@@ -36,7 +36,7 @@ def run(input_dir: Path, output_dir: Path) -> tuple[int, list[Path]]:
         records = parse_workbook(file)
         for rec in records:
             rec.history_note = note_for_rc(history_map, rec.rc)
-            rec.history_excel, rec.history_mail = note_split_for_rc(history_map, rec.rc)
+            rec.history_excel, rec.history_mail, rec.history_other_overviews = note_split_for_rc(history_map, rec.rc)
             rec.kurzname = _resolve_kurzname(kurzname_map, rec.wire_number)
         all_records.extend(records)
         processed_inputs.append(file)

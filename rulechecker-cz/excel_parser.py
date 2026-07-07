@@ -49,6 +49,7 @@ class IssueRecord:
     history_note: str = ""
     history_excel: str = ""
     history_mail: str = ""
+    history_other_overviews: str = ""
 
 
 def parse_workbook(path: Path) -> list[IssueRecord]:

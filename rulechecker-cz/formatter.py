@@ -31,6 +31,7 @@ CZ_COLUMNS = [
     "Notes",
     "HISTORY_EXCEL",
     "HISTORY_MAIL",
+    "HISTORIE_Z_JINYCH_PREHLEDU",
 ]
 EN_COLUMNS = [
     "Harness name",
@@ -48,6 +49,7 @@ EN_COLUMNS = [
     "Notes",
     "HISTORY_EXCEL",
     "HISTORY_MAIL",
+    "HISTORY_OTHER_OVERVIEWS",
 ]
 
 
@@ -111,6 +113,7 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Notes": "",
             "HISTORY_EXCEL": r.history_excel,
             "HISTORY_MAIL": r.history_mail,
+            "HISTORIE_Z_JINYCH_PREHLEDU": r.history_other_overviews,
         }
         for r in records
     ]
@@ -131,6 +134,7 @@ def build_output_frames(records: list[IssueRecord]) -> dict[str, pd.DataFrame]:
             "Notes": "",
             "HISTORY_EXCEL": r.history_excel,
             "HISTORY_MAIL": r.history_mail,
+            "HISTORY_OTHER_OVERVIEWS": r.history_other_overviews,
         }
         for r in records
     ]
@@ -170,6 +174,8 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
             _add_rc_hyperlinks(ws, records_by_sheet.get(sheet, []))
             _add_history_hyperlinks(ws, "HISTORY_EXCEL")
             _add_history_hyperlinks(ws, "HISTORY_MAIL")
+            _add_history_hyperlinks(ws, "HISTORIE_Z_JINYCH_PREHLEDU")
+            _add_history_hyperlinks(ws, "HISTORY_OTHER_OVERVIEWS")
             _format_sheet(ws, sheet)
             _add_priority_validation(ws)
             _add_progress_validation(ws)
@@ -178,6 +184,7 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
         _add_rc_hyperlinks(cz_data_ws, records_by_sheet.get(OUTPUT_SHEET_CZ, []))
         _add_history_hyperlinks(cz_data_ws, "HISTORY_EXCEL")
         _add_history_hyperlinks(cz_data_ws, "HISTORY_MAIL")
+        _add_history_hyperlinks(cz_data_ws, "HISTORIE_Z_JINYCH_PREHLEDU")
         _format_sheet(cz_data_ws, "CZ_Data")
         _add_priority_validation(cz_data_ws)
         _add_progress_validation(cz_data_ws)
@@ -185,6 +192,7 @@ def write_output_excel(out_path: Path, records: list[IssueRecord]) -> None:
         outline_ws = writer.book["CZ_RC_Svazek"]
         _add_history_hyperlinks(outline_ws, "HISTORY_EXCEL")
         _add_history_hyperlinks(outline_ws, "HISTORY_MAIL")
+        _add_history_hyperlinks(outline_ws, "HISTORIE_Z_JINYCH_PREHLEDU")
 
 
 
@@ -343,7 +351,7 @@ def _apply_readable_widths(ws) -> None:
     preferred = {
         "RC chyba": 34, "Název svazku": 28, "RC": 12, "Typ objektu": 18, "Identifikátor": 26, "Kurzname": 20,
         "Název chyby": 34, "Vysvětlení": 48, "Doporučení": 52, "Solution": 34, "Notes": 34,
-        "HISTORY_EXCEL": 42, "HISTORY_MAIL": 42, "Závažnost detailu": 18,
+        "HISTORY_EXCEL": 42, "HISTORY_MAIL": 42, "HISTORIE_Z_JINYCH_PREHLEDU": 54, "HISTORY_OTHER_OVERVIEWS": 54, "Závažnost detailu": 18,
     }
     for idx, cell in enumerate(ws[1], start=1):
         header = str(cell.value or "")
