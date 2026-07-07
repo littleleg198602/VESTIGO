@@ -13,6 +13,7 @@ CHECK_BLOCK_RE = re.compile(r"check\s*(\d{1,4})\s*[:\-]?\s*(.+)", re.IGNORECASE)
 
 RC_HEADERS = {"number of mistake", "prufung", "prüfung", "rc", "check"}
 NOTE_HEADERS = {"note", "poznamka", "poznámka", "komentar", "komentář", "comment"}
+OVERVIEW_NOTE_HEADERS = {"solution", "notes", "history excel", "history mail", "název chyby", "nazev chyby", "error title"}
 
 
 def build_history_map(history_dir: Path) -> dict[int, list[str]]:
@@ -51,6 +52,10 @@ def _load_excel_history(path: Path, out: dict[int, list[str]]) -> None:
         except Exception:
             continue
 
+        overview_loaded = _load_overview_history_sheet(path, df, out)
+        if overview_loaded:
+            continue
+
         header_row_idx, rc_col, note_col = _detect_note_layout(df)
         if header_row_idx is not None and rc_col is not None and note_col is not None:
             for _, row in df.iloc[header_row_idx + 1 :].iterrows():
@@ -66,6 +71,51 @@ def _load_excel_history(path: Path, out: dict[int, list[str]]) -> None:
         # nevznikaly falešné přiřazení RC (např. RC1 z běžných čísel v textu).
         continue
 
+
+def _load_overview_history_sheet(path: Path, df: pd.DataFrame, out: dict[int, list[str]]) -> bool:
+    header_row_idx, rc_col, note_cols = _detect_overview_layout(df)
+    if header_row_idx is None or rc_col is None or not note_cols:
+        return False
+
+    loaded = False
+    for _, row in df.iloc[header_row_idx + 1 :].iterrows():
+        rc_text = _clean_excel_text(str(row.iloc[rc_col] if rc_col < len(row) else ""))
+        rcs = _extract_rcs_from_rc_cell(rc_text)
+        if not rcs:
+            continue
+        snippets = []
+        for col_idx, label in note_cols:
+            if col_idx >= len(row):
+                continue
+            value = _clean_excel_text(str(row.iloc[col_idx]))
+            if not value or value.lower() == "nan":
+                continue
+            snippets.append(f"{label}: {value}")
+        detail = (
+            "; ".join(snippets)
+            or "RC chyba se už vyskytuje v jiném přehledu; ověřit, zda se týká stejného vodiče / objektu."
+        )
+        for rc in rcs:
+            out[rc].append(f"OVERVIEW|{_history_link(path)} Historie z jiného přehledu – {detail[:220]}")
+            loaded = True
+    return loaded
+
+
+def _detect_overview_layout(df: pd.DataFrame) -> tuple[int | None, int | None, list[tuple[int, str]]]:
+    for ridx in range(min(20, len(df.index))):
+        vals = [str(v) for v in df.iloc[ridx].tolist()]
+        norm = [_norm(v) for v in vals]
+        rc_col = next((i for i, v in enumerate(norm) if v == "rc"), None)
+        if rc_col is None:
+            continue
+        note_cols = []
+        for i, header in enumerate(norm):
+            if header in OVERVIEW_NOTE_HEADERS:
+                label = _clean_excel_text(vals[i]).replace("_", " ")
+                note_cols.append((i, label))
+        if note_cols:
+            return ridx, rc_col, note_cols
+    return None, None, []
 
 def _detect_note_layout(df: pd.DataFrame) -> tuple[int | None, int | None, int | None]:
     for ridx in range(min(20, len(df.index))):
@@ -139,19 +189,23 @@ def note_for_rc(history_map: dict[int, list[str]], rc: int) -> str:
     return unique[0] if unique else ""
 
 
-def note_split_for_rc(history_map: dict[int, list[str]], rc: int) -> tuple[str, str]:
+def note_split_for_rc(history_map: dict[int, list[str]], rc: int) -> tuple[str, str, str]:
     entries = history_map.get(rc, [])
     excel_note = ""
     mail_note = ""
+    overview_note = ""
     for e in entries:
         low = e.lower()
+        if not overview_note and e.startswith("OVERVIEW|"):
+            overview_note = e.removeprefix("OVERVIEW|")
+            continue
         if not excel_note and (".xlsx" in low or ".xls" in low):
             excel_note = e
         if not mail_note and ".msg" in low:
             mail_note = e
-        if excel_note and mail_note:
+        if excel_note and mail_note and overview_note:
             break
-    return excel_note, mail_note
+    return excel_note, mail_note, overview_note
 
 
 def _clean_excel_text(text: str) -> str:
